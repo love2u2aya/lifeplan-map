@@ -424,6 +424,7 @@ function startTour(){
 }
 function tourGo(n){
   if(!tour.on || !n) return;
+  clearTimeout(tour.timer);   // 二重タイマー防止
   tour.visited[n.id]=1;
   tourBtn.textContent="⏸ ツアー中 "+Object.keys(tour.visited).length+"/"+visibleNodes().length;
   selectNode(n);          // 説明パネル＋影響リンクの発光
@@ -499,16 +500,6 @@ elGraph.addEventListener("pointerup", function(e){
   var n=pickAt(e.clientX, e.clientY);
   if(n){ selectNode(n); flyTo(n); } else clearAll();
 });
-// 一時デバッグ窓口（原因特定後に削除）
-window.__dbg = {
-  pick: pickAt,
-  proj: function(id){ var n=byId[id]; if(!n) return null; var cam=Graph.camera();
-    var v=new THREE.Vector3(n.x||0,n.y||0,n.z||0).project(cam);
-    return {pos:[n.x,n.y,n.z], ndc:[v.x,v.y,v.z],
-      scr:[(v.x+1)/2*elGraph.clientWidth,(1-v.y)/2*elGraph.clientHeight]}; },
-  state: function(){ return {mouseIn:mouseIn, mouse:mouse, hover:hoverNode&&hoverNode.id,
-    w:elGraph.clientWidth, h:elGraph.clientHeight, camPos:Graph.camera().position}; }
-};
 (function pickLoop(){               // 自転などで星側が動いた場合もホバー判定が追従
   requestAnimationFrame(pickLoop);
   if(mouseIn) runPick();
