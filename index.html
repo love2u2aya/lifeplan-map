@@ -92,8 +92,8 @@ const GOLD = "#ffd479";
 
 async function boot(){
   const [{default:ForceGraph3D},{default:SpriteText},{UnrealBloomPass},THREE] = await Promise.all([
-    import("https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.mjs"),
-    import("https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.mjs"),
+    import("https://esm.sh/3d-force-graph@1.73.4?external=three"),
+    import("https://esm.sh/three-spritetext@1.8.2?external=three"),
     import("three/addons/postprocessing/UnrealBloomPass.js"),
     import("three"),
   ]);
