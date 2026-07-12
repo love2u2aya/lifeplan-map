@@ -494,6 +494,16 @@ elGraph.addEventListener("pointerup", function(e){
   var n=pickAt(e.clientX, e.clientY);
   if(n){ selectNode(n); flyTo(n); } else clearAll();
 });
+// 一時デバッグ窓口（原因特定後に削除）
+window.__dbg = {
+  pick: pickAt,
+  proj: function(id){ var n=byId[id]; if(!n) return null; var cam=Graph.camera();
+    var v=new THREE.Vector3(n.x||0,n.y||0,n.z||0).project(cam);
+    return {pos:[n.x,n.y,n.z], ndc:[v.x,v.y,v.z],
+      scr:[(v.x+1)/2*elGraph.clientWidth,(1-v.y)/2*elGraph.clientHeight]}; },
+  state: function(){ return {mouseIn:mouseIn, mouse:mouse, hover:hoverNode&&hoverNode.id,
+    w:elGraph.clientWidth, h:elGraph.clientHeight, camPos:Graph.camera().position}; }
+};
 (function pickLoop(){               // 回転中もホバー判定が追従するよう毎フレーム更新
   requestAnimationFrame(pickLoop);
   if(!mouseIn){ if(hoverNode){ hoverNode=null; elGraph.style.cursor="default"; updateTip(); } return; }
