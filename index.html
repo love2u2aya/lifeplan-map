@@ -480,8 +480,13 @@ function pickAt(px, py){
   return best;
 }
 var mouseIn=false, downAt=null;
-elGraph.addEventListener("pointermove", function(e){ mouse.x=e.clientX; mouse.y=e.clientY; mouseIn=true; });
-elGraph.addEventListener("pointerleave", function(){ mouseIn=false; });
+function runPick(){
+  var n = mouseIn ? pickAt(mouse.x, mouse.y) : null;
+  if(n!==hoverNode){ hoverNode=n; elGraph.style.cursor = n? "pointer":"default"; }
+  updateTip();
+}
+elGraph.addEventListener("pointermove", function(e){ mouse.x=e.clientX; mouse.y=e.clientY; mouseIn=true; runPick(); });
+elGraph.addEventListener("pointerleave", function(){ mouseIn=false; runPick(); });
 elGraph.addEventListener("pointerdown", function(e){
   downAt={x:e.clientX, y:e.clientY, t:Date.now()};
   if(tour.on) stopTour(); else wake();
@@ -504,12 +509,9 @@ window.__dbg = {
   state: function(){ return {mouseIn:mouseIn, mouse:mouse, hover:hoverNode&&hoverNode.id,
     w:elGraph.clientWidth, h:elGraph.clientHeight, camPos:Graph.camera().position}; }
 };
-(function pickLoop(){               // 回転中もホバー判定が追従するよう毎フレーム更新
+(function pickLoop(){               // 自転などで星側が動いた場合もホバー判定が追従
   requestAnimationFrame(pickLoop);
-  if(!mouseIn){ if(hoverNode){ hoverNode=null; elGraph.style.cursor="default"; updateTip(); } return; }
-  var n=pickAt(mouse.x, mouse.y);
-  if(n!==hoverNode){ hoverNode=n; elGraph.style.cursor=n?"pointer":"default"; }
-  updateTip();
+  if(mouseIn) runPick();
 })();
 
 // ---- イントロ ----
