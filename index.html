@@ -173,19 +173,26 @@ var tour={on:false, timer:null, visited:{}};
 
 // ---- ホバー説明チップ ----
 var tip=document.getElementById("tip");
-function showTip(){
-  if(!hoverNode || tour.on){ tip.style.display="none"; return; }
-  var n=hoverNode;
-  tip.innerHTML = '<b class="t">'+n.label+'</b>'
-    + '<span class="lv" style="background:'+LV[n.lv]+'">L'+n.lv+'</span>'
-    + '<span style="color:#8fa0b5;font-size:10px;margin-left:6px">'+DOMAINS[n.dom].name+'</span>'
-    + '<div style="margin-top:5px;color:#c9d4e3">'+n.desc+'</div>';
-  tip.style.display="block";
-  var x=Math.min(mouse.x+16, innerWidth - tip.offsetWidth - 10);
-  var y=Math.min(mouse.y+16, innerHeight - tip.offsetHeight - 10);
-  tip.style.left=Math.max(0,x)+"px"; tip.style.top=Math.max(0,y)+"px";
+var tipFor=null;
+function updateTip(){
+  if(hoverNode!==tipFor){
+    tipFor=hoverNode;
+    if(!hoverNode || tour.on){ tip.style.display="none"; }
+    else{
+      var n=hoverNode;
+      tip.innerHTML = '<b class="t">'+n.label+'</b>'
+        + '<span class="lv" style="background:'+LV[n.lv]+'">L'+n.lv+'</span>'
+        + '<span style="color:#8fa0b5;font-size:10px;margin-left:6px">'+DOMAINS[n.dom].name+'</span>'
+        + '<div style="margin-top:5px;color:#c9d4e3">'+n.desc+'</div>';
+      tip.style.display="block";
+    }
+  }
+  if(hoverNode && !tour.on && tip.style.display==="block"){
+    var x=Math.min(mouse.x+16, innerWidth - tip.offsetWidth - 10);
+    var y=Math.min(mouse.y+16, innerHeight - tip.offsetHeight - 10);
+    tip.style.left=Math.max(0,x)+"px"; tip.style.top=Math.max(0,y)+"px";
+  }
 }
-window.addEventListener("mousemove", function(e){ mouse.x=e.clientX; mouse.y=e.clientY; if(hoverNode) showTip(); });
 
 function linkKey(l){ var a=l.source.id||l.source, b=l.target.id||l.target; return a<b? a+"|"+b : b+"|"+a; }
 
@@ -218,10 +225,8 @@ var Graph = ForceGraph3D({controlType:"orbit"})(elGraph)
   .linkDirectionalParticles(function(l){ return actL[linkKey(l)] ? 4 : 1; })
   .linkDirectionalParticleSpeed(function(l){ return actL[linkKey(l)] ? 0.011 : 0.0032; })
   .linkDirectionalParticleWidth(function(l){ return actL[linkKey(l)] ? 2.6 : 1.2; })
-  .linkDirectionalParticleColor(function(l){ return actL[linkKey(l)] ? "#ffe9a8" : "#6f8fd0"; })
-  .onNodeClick(function(n){ if(tour.on) stopTour(); selectNode(n); flyTo(n); })
-  .onNodeHover(function(n){ hoverNode=n; elGraph.style.cursor = n? "pointer":"default"; showTip(); })
-  .onBackgroundClick(function(){ if(tour.on) stopTour(); clearAll(); });
+  .linkDirectionalParticleColor(function(l){ return actL[linkKey(l)] ? "#ffe9a8" : "#6f8fd0"; });
+  // ※クリック/ホバーはライブラリのレイキャストでなく自前のスクリーン座標判定で行う（下方参照）
 
 // 力学：分野クラスタへ緩く引き寄せ
 var clusterForce = function(alpha){ nodes.forEach(function(n){
@@ -453,8 +458,49 @@ var controls=Graph.controls();
 controls.autoRotate=true; controls.autoRotateSpeed=0.55;
 var idleT;
 function wake(){ controls.autoRotate=false; clearTimeout(idleT); idleT=setTimeout(function(){controls.autoRotate=true;},18000); }
-elGraph.addEventListener("pointerdown", function(){ if(tour.on) stopTour(); else wake(); });
 elGraph.addEventListener("wheel", function(){ if(tour.on) stopTour(); else wake(); }, {passive:true});
+
+// ---- 自前の当たり判定（画面上で星の近くならヒット＝少し離れていてもOK）----
+function pickAt(px, py){
+  var cam=Graph.camera(), w=elGraph.clientWidth, h=elGraph.clientHeight;
+  if(!cam) return null;
+  var tanH=Math.tan((cam.fov||75)*0.5*Math.PI/180);
+  var best=null, bestD=1e9;
+  for(var i=0;i<nodes.length;i++){
+    var n=nodes[i]; if(n.lv>maxLv) continue;
+    var v=new THREE.Vector3(n.x||0, n.y||0, n.z||0).project(cam);
+    if(v.z>1 || v.z<-1) continue;   // カメラの後ろ・範囲外
+    var sx=(v.x+1)/2*w, sy=(1-v.y)/2*h;
+    var dist=Math.hypot((n.x||0)-cam.position.x, (n.y||0)-cam.position.y, (n.z||0)-cam.position.z);
+    var rScr=(n.__r||5)*(h/2)/(tanH*Math.max(dist,1));   // 星の見かけ半径(px)
+    var th=Math.max(26, rScr*1.9);                        // 判定半径：見かけの約2倍
+    var d=Math.hypot(sx-px, sy-py);
+    if(d<th && d<bestD){ bestD=d; best=n; }
+  }
+  return best;
+}
+var mouseIn=false, downAt=null;
+elGraph.addEventListener("pointermove", function(e){ mouse.x=e.clientX; mouse.y=e.clientY; mouseIn=true; });
+elGraph.addEventListener("pointerleave", function(){ mouseIn=false; });
+elGraph.addEventListener("pointerdown", function(e){
+  downAt={x:e.clientX, y:e.clientY, t:Date.now()};
+  if(tour.on) stopTour(); else wake();
+});
+elGraph.addEventListener("pointerup", function(e){
+  if(!downAt) return;
+  var moved=Math.hypot(e.clientX-downAt.x, e.clientY-downAt.y), dt=Date.now()-downAt.t;
+  downAt=null;
+  if(moved>6 || dt>600) return;    // ドラッグ（回転操作）はクリック扱いしない
+  var n=pickAt(e.clientX, e.clientY);
+  if(n){ selectNode(n); flyTo(n); } else clearAll();
+});
+(function pickLoop(){               // 回転中もホバー判定が追従するよう毎フレーム更新
+  requestAnimationFrame(pickLoop);
+  if(!mouseIn){ if(hoverNode){ hoverNode=null; elGraph.style.cursor="default"; updateTip(); } return; }
+  var n=pickAt(mouse.x, mouse.y);
+  if(n!==hoverNode){ hoverNode=n; elGraph.style.cursor=n?"pointer":"default"; }
+  updateTip();
+})();
 
 // ---- イントロ ----
 Graph.cameraPosition({x:0,y:60,z:1500});
