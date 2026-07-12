@@ -8,13 +8,15 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { height:100%; overflow:hidden; background:#04060f; font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; color:#e8eaed; }
   #graph { position:absolute; inset:0; }
-  .glass { background:rgba(10,15,28,.72); border:1px solid rgba(120,150,210,.22); border-radius:14px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 8px 32px rgba(0,0,0,.45); }
+  .glass { background:rgba(10,15,28,.78); border:1px solid rgba(120,150,210,.22); border-radius:14px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 8px 32px rgba(0,0,0,.45); }
   #toolbar { position:absolute; top:14px; left:14px; z-index:10; padding:12px 14px; max-width:540px; }
   #toolbar h1 { font-size:14px; margin-bottom:10px; background:linear-gradient(90deg,#ffd479,#ff9d6c); -webkit-background-clip:text; background-clip:text; color:transparent; letter-spacing:.5px; }
   .lvbtns { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .lvbtn { border:1px solid rgba(120,150,210,.3); background:rgba(30,40,66,.6); color:#cfd6df; border-radius:20px; padding:5px 12px; font-size:12px; cursor:pointer; transition:all .2s; }
   .lvbtn:hover { border-color:#ffd479; }
   .lvbtn.active { background:linear-gradient(135deg,#3d5a80,#5a4a8a); border-color:#8fb8e8; color:#fff; box-shadow:0 0 12px rgba(110,168,216,.5); }
+  .lvbtn.diag { border-color:#ffd479; color:#ffd479; }
+  .lvbtn.diag:hover { background:rgba(90,70,30,.5); box-shadow:0 0 12px rgba(255,212,121,.4); }
   #search { width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(120,150,210,.3); background:rgba(20,28,46,.7); color:#e8eaed; font-size:13px; outline:none; }
   #search:focus { border-color:#ffd479; box-shadow:0 0 10px rgba(255,212,121,.25); }
   .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:9px; font-size:11px; color:#aab3bf; }
@@ -26,10 +28,12 @@
   #panel .meta { font-size:12px; color:#9aa5b1; margin-bottom:10px; }
   #panel .badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; color:#fff; margin-right:6px; }
   #panel p { font-size:13px; line-height:1.75; margin-bottom:14px; }
-  #panel h3 { font-size:12px; color:#8fa0b5; margin-bottom:8px; letter-spacing:1px; }
+  #panel h3 { font-size:12px; color:#8fa0b5; margin:12px 0 8px; letter-spacing:1px; }
   .chip { display:inline-block; margin:0 6px 7px 0; padding:4px 11px; background:rgba(36,48,74,.8); border:1px solid #3a4a5f; border-radius:14px; font-size:12px; cursor:pointer; color:#cfe0f0; transition:all .15s; }
   .chip:hover { background:rgba(70,90,130,.9); box-shadow:0 0 10px rgba(140,180,255,.3); transform:translateY(-1px); }
   .hint { color:#8a96a6; font-size:12px; line-height:1.9; }
+  .pbtn { display:inline-block; margin-top:6px; padding:7px 14px; border-radius:8px; border:1px solid #ffd479; background:rgba(90,70,30,.4); color:#ffd479; font-size:13px; cursor:pointer; }
+  .pbtn:hover { box-shadow:0 0 14px rgba(255,212,121,.4); }
   #loading { position:absolute; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#04060f; transition:opacity .8s; }
   #loading .orb { width:56px; height:56px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #ffd479, #b0682a 60%, transparent); box-shadow:0 0 44px #ffd479aa; animation:pulse 1.4s ease-in-out infinite; margin-bottom:22px; }
   @keyframes pulse { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.18);opacity:1} }
@@ -38,7 +42,21 @@
   #fallback a { color:#ffd479; }
   .foot { position:absolute; bottom:12px; left:14px; z-index:10; font-size:11px; color:#5f6c80; }
   .foot a { color:#8fa8cf; text-decoration:none; }
-  @media (max-width:900px){ #panel{ width:min(86vw,330px); top:auto; max-height:44vh; } #toolbar{ max-width:78vw; } }
+  /* 診断モーダル */
+  #diag { display:none; position:absolute; inset:0; z-index:40; background:rgba(2,4,10,.72); }
+  #diag .box { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(560px,92vw); max-height:88vh; overflow-y:auto; padding:22px 24px; }
+  #diag h2 { font-size:17px; color:#ffd479; margin-bottom:4px; }
+  #diag .sub { font-size:12px; color:#8a96a6; margin-bottom:14px; }
+  #diag h3 { font-size:13px; color:#cfd9ea; margin:14px 0 7px; }
+  .opts { display:flex; flex-wrap:wrap; gap:7px; }
+  .opt { padding:6px 13px; border-radius:18px; border:1px solid rgba(120,150,210,.35); background:rgba(30,40,66,.6); color:#cfd6df; font-size:13px; cursor:pointer; user-select:none; transition:all .15s; }
+  .opt.on { background:linear-gradient(135deg,#7a5a20,#5a4a8a); border-color:#ffd479; color:#fff; box-shadow:0 0 10px rgba(255,212,121,.45); }
+  #diag .actions { margin-top:20px; display:flex; gap:10px; justify-content:flex-end; }
+  .gbtn { padding:9px 20px; border-radius:9px; font-size:14px; cursor:pointer; border:1px solid rgba(120,150,210,.35); background:rgba(30,40,66,.6); color:#cfd6df; }
+  .gbtn.go { background:linear-gradient(135deg,#b8860b,#8a5aaa); border-color:#ffd479; color:#fff; font-weight:bold; }
+  .gbtn.go:hover { box-shadow:0 0 18px rgba(255,212,121,.55); }
+  .rank1 { border-color:#ffd479 !important; box-shadow:0 0 8px rgba(255,212,121,.35); }
+  @media (max-width:900px){ #panel{ width:min(86vw,330px); top:auto; max-height:46vh; } #toolbar{ max-width:78vw; } }
 </style>
 </head>
 <body>
@@ -57,18 +75,9 @@
   </div>
 </div>
 
-<div id="panel" class="glass">
-  <h2>操作ガイド</h2>
-  <p class="hint">
-    ⭐ <b>星をクリック</b> → カメラが飛び、影響しあう要素だけが金色に光ります。<br>
-    🖱 ドラッグで回転、ホイールで拡大縮小。放っておくとゆっくり自転します。<br>
-    🎚 左上のボタンでマニアック度を絞り込み（L1→L5で知識の地層が増える）。<br>
-    ✨ リンク上を流れる光の粒は「影響の流れ」。<br><br>
-    大きい星ほど基本、色が赤紫に寄るほどマニアック。星の集まり（星座）が分野です。
-  </p>
-</div>
+<div id="panel" class="glass"></div>
 
-<div class="foot">95要素 × 217リンク ｜ <a href="map2d.html">🗺 2D俯瞰版はこちら</a></div>
+<div class="foot">95要素 × 217リンク ｜ <a href="map2d.html">🗺 2D俯瞰版</a></div>
 
 <div id="loading"><div class="orb"></div><div class="txt">ライフプラン宇宙を生成中…</div></div>
 <div id="fallback" class="glass">
@@ -76,206 +85,320 @@
   <a href="map2d.html">2D版マップ</a> をご利用ください。
 </div>
 
+<!-- 診断モーダル -->
+<div id="diag">
+  <div class="box glass">
+    <h2>🧭 わたしの優先マップ診断</h2>
+    <div class="sub">5つ答えると、あなたが優先すべきテーマだけが「星座」として夜空に浮かびます。</div>
+    <div id="qs"></div>
+    <div class="actions">
+      <button class="gbtn" id="diagCancel">閉じる</button>
+      <button class="gbtn go" id="diagGo">⭐ わたしの星座を描く</button>
+    </div>
+  </div>
+</div>
+
 <script src="data.js"></script>
-<script type="importmap">
-{ "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-    "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-} }
-</script>
-<script type="module">
-const LV = {
-  1:{c:"#3dffa0"}, 2:{c:"#4dc3ff"}, 3:{c:"#b07bff"}, 4:{c:"#ffab4d"}, 5:{c:"#ff5c8a"}
-};
-const GOLD = "#ffd479";
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js" onerror="window.__cdnFail=1"></script>
+<script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js" onerror="window.__cdnFail=1"></script>
+<script src="https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.min.js" onerror="window.__cdnFail=1"></script>
+<script>
+(function(){
+"use strict";
+if (window.__cdnFail || !window.ForceGraph3D || !window.THREE || !window.SpriteText) {
+  document.getElementById("loading").remove();
+  document.getElementById("fallback").style.display = "block";
+  return;
+}
+var LV = {1:"#3dffa0", 2:"#4dc3ff", 3:"#b07bff", 4:"#ffab4d", 5:"#ff5c8a"};
+var GOLD = "#ffd479";
+var DOMAINS = window.LP.DOMAINS, NODES = window.LP.NODES;
 
-async function boot(){
-  const [{default:ForceGraph3D},{default:SpriteText},{UnrealBloomPass},THREE] = await Promise.all([
-    import("https://esm.sh/3d-force-graph@1.73.4?external=three"),
-    import("https://esm.sh/three-spritetext@1.8.2?external=three"),
-    import("three/addons/postprocessing/UnrealBloomPass.js"),
-    import("three"),
-  ]);
+// ---- グラフデータ ----
+var nodes = NODES.map(function(n){ return Object.assign({}, n); });
+var byId = {}; nodes.forEach(function(n){ byId[n.id] = n; });
+var seenE = {}, links = [];
+nodes.forEach(function(n){ (n.links||[]).forEach(function(t){
+  if(!byId[t]) return;
+  var k = n.id < t ? n.id+"|"+t : t+"|"+n.id;
+  if(!seenE[k]){ seenE[k]=1; links.push({source:n.id, target:t}); }
+});});
+var deg = {}; links.forEach(function(l){ deg[l.source]=(deg[l.source]||0)+1; deg[l.target]=(deg[l.target]||0)+1; });
 
-  const {DOMAINS, NODES} = window.LP;
+var CX=1450, CY=960, S=0.62;
+nodes.forEach(function(n){
+  var d = DOMAINS[n.dom];
+  n.ax=(d.x-CX)*S; n.ay=-(d.y-CY)*S;
+  n.x=n.ax+(Math.random()-0.5)*60; n.y=n.ay+(Math.random()-0.5)*60; n.z=(Math.random()-0.5)*120;
+});
 
-  // ---- グラフデータ構築 ----
-  const nodes = NODES.map(n=>({...n}));
-  const byId = Object.fromEntries(nodes.map(n=>[n.id,n]));
-  const seen = new Set(); const links = [];
-  nodes.forEach(n=>(n.links||[]).forEach(t=>{
-    if(!byId[t]) return;
-    const k = n.id<t? n.id+"|"+t : t+"|"+n.id;
-    if(!seen.has(k)){ seen.add(k); links.push({source:n.id, target:t}); }
-  }));
-  const deg = {}; links.forEach(l=>{ deg[l.source]=(deg[l.source]||0)+1; deg[l.target]=(deg[l.target]||0)+1; });
-
-  // 分野クラスタのアンカー座標（2Dレイアウトを3D空間へ写像）
-  const CX=1450, CY=960, S=0.62;
-  nodes.forEach(n=>{
-    const d = DOMAINS[n.dom];
-    n.ax=(d.x-CX)*S; n.ay=-(d.y-CY)*S;
-    n.x=n.ax+(Math.random()-0.5)*60; n.y=n.ay+(Math.random()-0.5)*60; n.z=(Math.random()-0.5)*120;
-  });
-
-  // ---- 状態 ----
-  let selected=null, maxLv=5;
-  const hlN=new Set(); const hlL=new Set();
-
-  const elGraph = document.getElementById("graph");
-  const Graph = ForceGraph3D({controlType:"orbit"})(elGraph)
-    .backgroundColor("#04060f")
-    .graphData({nodes, links})
-    .nodeThreeObject(n=>{
-      const r = 3.4 + (5-n.lv)*1.05 + Math.min(deg[n.id]||1,12)*0.30;
-      n.__r=r;
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(r,24,24),
-        new THREE.MeshLambertMaterial({color:LV[n.lv].c, emissive:LV[n.lv].c, emissiveIntensity:0.55, transparent:true, opacity:0.95})
-      );
-      const label = new SpriteText(n.label, 4.4, "#9fb2ca");
-      label.fontFace = "Hiragino Sans, sans-serif";
-      label.material.depthWrite=false;
-      label.material.transparent=true;
-      label.position.y = -(r+6);
-      mesh.add(label);
-      n.__mat=mesh.material; n.__label=label; n.__mesh=mesh;
-      return mesh;
-    })
-    .nodeVisibility(n=>n.lv<=maxLv)
-    .linkVisibility(l=>l.source.lv<=maxLv && l.target.lv<=maxLv)
-    .linkColor(l=> hlL.has(l) ? GOLD : (selected? "rgba(30,42,70,0.9)" : "rgba(90,115,165,0.75)"))
-    .linkOpacity(0.35)
-    .linkWidth(l=> hlL.has(l)? 1.6 : 0.35)
-    .linkDirectionalParticles(l=> hlL.has(l)? 4 : 1)
-    .linkDirectionalParticleSpeed(l=> hlL.has(l)? 0.011 : 0.0032)
-    .linkDirectionalParticleWidth(l=> hlL.has(l)? 2.4 : 1.1)
-    .linkDirectionalParticleColor(l=> hlL.has(l)? "#ffe9a8" : "#6f8fd0")
-    .onNodeClick(n=>{ select(n); flyTo(n); })
-    .onNodeHover(n=> elGraph.style.cursor = n? "pointer":"default")
-    .onBackgroundClick(()=> select(null));
-
-  // 力学：分野クラスタへ緩く引き寄せる
-  const clusterForce = alpha=>{ nodes.forEach(n=>{
-    n.vx += (n.ax-n.x)*0.055*alpha; n.vy += (n.ay-n.y)*0.055*alpha; n.vz += (0-n.z)*0.018*alpha;
-  });};
-  clusterForce.initialize=()=>{};
-  Graph.d3Force("cluster", clusterForce);
-  Graph.d3Force("charge").strength(-150);
-  Graph.d3Force("link").distance(55);
-
-  // ---- 発光（ブルーム） ----
-  const bloom = new UnrealBloomPass();
-  bloom.strength=1.35; bloom.radius=0.55; bloom.threshold=0.22;
-  Graph.postProcessingComposer().addPass(bloom);
-
-  // ---- 星空と分野ラベル ----
-  const scene = Graph.scene();
-  {
-    const g=new THREE.BufferGeometry(); const pos=[];
-    for(let i=0;i<1600;i++){ const R=900+Math.random()*1400, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
-      pos.push(R*Math.sin(ph)*Math.cos(th), R*Math.sin(ph)*Math.sin(th), R*Math.cos(ph)); }
-    g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
-    scene.add(new THREE.Points(g, new THREE.PointsMaterial({color:"#7f93bd", size:1.3, transparent:true, opacity:0.65, depthWrite:false})));
-  }
-  Object.values(DOMAINS).forEach(d=>{
-    const t=new SpriteText(d.name, 13, "rgba(105,130,175,0.5)");
-    t.fontFace="Hiragino Sans, sans-serif"; t.material.depthWrite=false;
-    t.position.set((d.x-CX)*S, -(d.y-CY)*S + 150, -40);
-    scene.add(t);
-  });
-
-  // ---- 選択・ハイライト ----
-  function restyle(){
-    nodes.forEach(n=>{
-      const on = !selected || hlN.has(n.id);
-      if(n.__mat){ n.__mat.opacity = on?0.95:0.10;
-        n.__mat.emissiveIntensity = (selected && n.id===selected.id)? 1.4 : (on?0.55:0.10); }
-      if(n.__label) n.__label.material.opacity = on?1:0.05;
-      if(n.__mesh){ const s=(selected&&n.id===selected.id)?1.35:1; n.__mesh.scale.set(s,s,s); }
-    });
-    Graph.linkColor(Graph.linkColor());
-    Graph.linkWidth(Graph.linkWidth());
-    Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
-  }
-  const panel=document.getElementById("panel");
-  function select(n){
-    selected=n; hlN.clear(); hlL.clear();
-    if(n){
-      hlN.add(n.id);
-      links.forEach(l=>{
-        const a=l.source.id||l.source, b=l.target.id||l.target;
-        if(a===n.id||b===n.id){ hlL.add(l); hlN.add(a===n.id?b:a); }
-      });
-      const neighbors=[...hlN].filter(id=>id!==n.id).map(id=>byId[id]).filter(m=>m.lv<=maxLv).sort((x,y)=>x.lv-y.lv);
-      panel.innerHTML = `
-        <h2>${n.label}</h2>
-        <div class="meta">
-          <span class="badge" style="background:${LV[n.lv].c};color:#0a0f1c">マニアック度 L${n.lv}</span>
-          <span class="badge" style="background:rgba(70,85,115,.8)">${DOMAINS[n.dom].name}</span>
-        </div>
-        <p>${n.desc}</p>
-        <h3>🔗 影響しあう要素（${neighbors.length}）</h3>
-        <div>${neighbors.map(m=>`<span class="chip" data-id="${m.id}" style="border-color:${LV[m.lv].c}">${m.label} <small style="color:${LV[m.lv].c}">L${m.lv}</small></span>`).join("")}</div>`;
-      panel.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{ const m=byId[c.dataset.id]; select(m); flyTo(m); }));
-    } else {
-      panel.innerHTML = `<h2>操作ガイド</h2><p class="hint">⭐ <b>星をクリック</b> → カメラが飛び、影響しあう要素だけが金色に光ります。<br>🖱 ドラッグで回転、ホイールで拡大縮小。放っておくとゆっくり自転します。<br>🎚 左上のボタンでマニアック度を絞り込み。<br>✨ 光の粒は「影響の流れ」。</p>`;
-    }
-    restyle();
-  }
-  function flyTo(n){
-    const dist=140; const dr=1+dist/Math.hypot(n.x||1,n.y||1,n.z||1);
-    Graph.cameraPosition({x:n.x*dr, y:n.y*dr, z:n.z*dr}, n, 1300);
-  }
-
-  // ---- レベルフィルタ ----
-  const lvbtns=document.getElementById("lvbtns");
-  [["1","基本のみ"],["2","〜FP級"],["3","〜実務"],["4","〜専門家"],["5","全宇宙"]].forEach(([lv,name])=>{
-    const b=document.createElement("button");
-    b.className="lvbtn"+(lv==="5"?" active":""); b.textContent=`L${lv} ${name}`;
-    b.addEventListener("click",()=>{
-      maxLv=+lv;
-      lvbtns.querySelectorAll(".lvbtn").forEach(x=>x.classList.remove("active"));
-      b.classList.add("active");
-      if(selected && selected.lv>maxLv) selected=null;
-      Graph.nodeVisibility(Graph.nodeVisibility());
-      Graph.linkVisibility(Graph.linkVisibility());
-      select(selected);
-    });
-    lvbtns.appendChild(b);
-  });
-
-  // ---- 検索 ----
-  document.getElementById("search").addEventListener("input",e=>{
-    const q=e.target.value.trim(); if(!q) return;
-    const hit=nodes.find(n=>n.lv<=maxLv && (n.label.includes(q)||n.desc.includes(q)));
-    if(hit){ select(hit); flyTo(hit); }
-  });
-
-  // ---- 自動回転（触ると止まり、18秒放置で再開） ----
-  const controls=Graph.controls();
-  controls.autoRotate=true; controls.autoRotateSpeed=0.55;
-  let idleT;
-  const wake=()=>{ controls.autoRotate=false; clearTimeout(idleT); idleT=setTimeout(()=>controls.autoRotate=true,18000); };
-  elGraph.addEventListener("pointerdown",wake);
-  elGraph.addEventListener("wheel",wake,{passive:true});
-
-  // ---- イントロ：遠景からズームイン ----
-  Graph.cameraPosition({x:0,y:60,z:1500});
-  setTimeout(()=>Graph.cameraPosition({x:0,y:50,z:560},undefined,2800), 500);
-
-  window.addEventListener("resize",()=>{ Graph.width(innerWidth); Graph.height(innerHeight); });
-
-  const ld=document.getElementById("loading");
-  ld.style.opacity=0; setTimeout(()=>ld.remove(),850);
+// ---- ハロー（発光）テクスチャ ----
+var haloCache = {};
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function haloTexture(color){
+  if(haloCache[color]) return haloCache[color];
+  var c=document.createElement("canvas"); c.width=c.height=128;
+  var x=c.getContext("2d"), rgb=hex2rgb(color);
+  var g=x.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0, "rgba("+rgb+",0.85)");
+  g.addColorStop(0.25,"rgba("+rgb+",0.30)");
+  g.addColorStop(1, "rgba("+rgb+",0)");
+  x.fillStyle=g; x.fillRect(0,0,128,128);
+  var tex=new THREE.CanvasTexture(c);
+  haloCache[color]=tex; return tex;
+}
+function makeHalo(color, size){
+  var m=new THREE.SpriteMaterial({map:haloTexture(color), blending:THREE.AdditiveBlending, depthWrite:false, transparent:true});
+  var s=new THREE.Sprite(m); s.scale.set(size,size,1); return s;
 }
 
-boot().catch(err=>{
-  console.error(err);
-  document.getElementById("loading").remove();
-  document.getElementById("fallback").style.display="block";
+// ---- 状態 ----
+var mode=null;            // null | "node" | "con"
+var selected=null;        // modeが"node"のときの選択ノード
+var actN={}, actL={};     // ハイライト対象（id→true / linkキー→true）
+var conRank=[];           // 診断の順位リスト
+var maxLv=5;
+
+function linkKey(l){ var a=l.source.id||l.source, b=l.target.id||l.target; return a<b? a+"|"+b : b+"|"+a; }
+
+var elGraph = document.getElementById("graph");
+var Graph = ForceGraph3D({controlType:"orbit"})(elGraph)
+  .backgroundColor("#04060f")
+  .graphData({nodes:nodes, links:links})
+  .nodeThreeObject(function(n){
+    var r = 3.4 + (5-n.lv)*1.05 + Math.min(deg[n.id]||1,12)*0.30;
+    n.__r = r;
+    var mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(r,24,24),
+      new THREE.MeshLambertMaterial({color:LV[n.lv], emissive:LV[n.lv], emissiveIntensity:0.45, transparent:true, opacity:0.95})
+    );
+    var halo = makeHalo(LV[n.lv], r*7);
+    mesh.add(halo);
+    var label = new SpriteText(n.label, 4.4, "#c6d3e6");
+    label.fontFace = "Hiragino Sans, sans-serif";
+    label.material.depthWrite = false; label.material.transparent = true;
+    label.position.y = -(r+6);
+    mesh.add(label);
+    n.__mat=mesh.material; n.__halo=halo; n.__label=label; n.__mesh=mesh;
+    return mesh;
+  })
+  .nodeVisibility(function(n){ return n.lv<=maxLv; })
+  .linkVisibility(function(l){ return l.source.lv<=maxLv && l.target.lv<=maxLv; })
+  .linkColor(function(l){ return actL[linkKey(l)] ? GOLD : (mode? "rgba(28,40,66,0.9)" : "rgba(95,120,170,0.8)"); })
+  .linkOpacity(0.4)
+  .linkWidth(function(l){ return actL[linkKey(l)] ? 1.6 : 0.35; })
+  .linkDirectionalParticles(function(l){ return actL[linkKey(l)] ? 4 : 1; })
+  .linkDirectionalParticleSpeed(function(l){ return actL[linkKey(l)] ? 0.011 : 0.0032; })
+  .linkDirectionalParticleWidth(function(l){ return actL[linkKey(l)] ? 2.6 : 1.2; })
+  .linkDirectionalParticleColor(function(l){ return actL[linkKey(l)] ? "#ffe9a8" : "#6f8fd0"; })
+  .onNodeClick(function(n){ selectNode(n); flyTo(n); })
+  .onNodeHover(function(n){ elGraph.style.cursor = n? "pointer":"default"; })
+  .onBackgroundClick(function(){ clearAll(); });
+
+// 力学：分野クラスタへ緩く引き寄せ
+var clusterForce = function(alpha){ nodes.forEach(function(n){
+  n.vx += (n.ax-n.x)*0.055*alpha; n.vy += (n.ay-n.y)*0.055*alpha; n.vz += (0-n.z)*0.018*alpha;
+});};
+clusterForce.initialize = function(){};
+Graph.d3Force("cluster", clusterForce);
+Graph.d3Force("charge").strength(-150);
+Graph.d3Force("link").distance(55);
+
+// ---- 星空・分野ラベル ----
+var scene = Graph.scene();
+(function(){
+  var g=new THREE.BufferGeometry(), pos=[];
+  for(var i=0;i<1600;i++){ var R=900+Math.random()*1400, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    pos.push(R*Math.sin(ph)*Math.cos(th), R*Math.sin(ph)*Math.sin(th), R*Math.cos(ph)); }
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({color:0x7f93bd, size:1.3, transparent:true, opacity:0.65, depthWrite:false})));
+})();
+Object.keys(DOMAINS).forEach(function(k){
+  var d=DOMAINS[k];
+  var t=new SpriteText(d.name, 13, "rgba(105,130,175,0.5)");
+  t.fontFace="Hiragino Sans, sans-serif"; t.material.depthWrite=false;
+  t.position.set((d.x-CX)*S, -(d.y-CY)*S + 150, -40);
+  scene.add(t);
 });
+
+// ---- スタイル反映 ----
+function restyle(){
+  nodes.forEach(function(n){
+    var on = !mode || actN[n.id];
+    var top = (mode==="node" && selected && n.id===selected.id) || (mode==="con" && conRank.length && conRank[0]===n.id);
+    if(n.__mat){ n.__mat.opacity = on?0.95:0.08;
+      n.__mat.emissiveIntensity = top?1.1 : (on?0.45:0.06); }
+    if(n.__halo) n.__halo.material.opacity = on?1:0.04;
+    if(n.__label) n.__label.material.opacity = on?1:0.04;
+    if(n.__mesh){ var s = top?1.35 : (mode==="con" && actN[n.id] ? 1.12 : 1); n.__mesh.scale.set(s,s,s); }
+  });
+  Graph.linkColor(Graph.linkColor());
+  Graph.linkWidth(Graph.linkWidth());
+  Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
+}
+function clearHL(){ actN={}; actL={}; }
+
+var panel=document.getElementById("panel");
+function guide(){
+  panel.innerHTML = '<h2>操作ガイド</h2><p class="hint">⭐ <b>星をクリック</b> → カメラが飛び、影響しあう要素だけが金色に光ります。<br>🖱 ドラッグで回転、ホイールで拡大縮小。放っておくとゆっくり自転します。<br>🎚 左上のボタンでマニアック度を絞り込み。<br>✨ 光の粒は「影響の流れ」。</p>'
+    + '<h3>🧭 FPツールとして使う</h3><p class="hint">「わたしの優先マップ診断」で5問答えると、優先テーマだけが星座として浮かびます。面談・セミナーの導入にどうぞ。</p>'
+    + '<button class="pbtn" id="pDiag">🧭 わたしの優先マップ診断</button>';
+  document.getElementById("pDiag").addEventListener("click", openDiag);
+}
+function clearAll(){ mode=null; selected=null; conRank=[]; clearHL(); guide(); restyle(); }
+
+// ---- 単体選択 ----
+function selectNode(n){
+  mode="node"; selected=n; clearHL();
+  actN[n.id]=true;
+  links.forEach(function(l){
+    var a=l.source.id||l.source, b=l.target.id||l.target;
+    if(a===n.id||b===n.id){ actL[a<b?a+"|"+b:b+"|"+a]=true; actN[a===n.id?b:a]=true; }
+  });
+  var neighbors=Object.keys(actN).filter(function(id){return id!==n.id;}).map(function(id){return byId[id];})
+    .filter(function(m){return m.lv<=maxLv;}).sort(function(x,y){return x.lv-y.lv;});
+  panel.innerHTML = '<h2>'+n.label+'</h2>'
+    + '<div class="meta"><span class="badge" style="background:'+LV[n.lv]+';color:#0a0f1c">マニアック度 L'+n.lv+'</span>'
+    + '<span class="badge" style="background:rgba(70,85,115,.8)">'+DOMAINS[n.dom].name+'</span></div>'
+    + '<p>'+n.desc+'</p>'
+    + '<h3>🔗 影響しあう要素（'+neighbors.length+'）</h3>'
+    + '<div>'+neighbors.map(function(m){return '<span class="chip" data-id="'+m.id+'" style="border-color:'+LV[m.lv]+'">'+m.label+' <small style="color:'+LV[m.lv]+'">L'+m.lv+'</small></span>';}).join("")+'</div>';
+  panel.querySelectorAll(".chip").forEach(function(c){ c.addEventListener("click", function(){ var m=byId[c.dataset.id]; selectNode(m); flyTo(m); }); });
+  restyle();
+}
+function flyTo(n){
+  var dist=140, dr=1+dist/Math.hypot(n.x||1,n.y||1,n.z||1);
+  Graph.cameraPosition({x:n.x*dr, y:n.y*dr, z:n.z*dr}, n, 1300);
+}
+
+// ---- 診断（FPツール）----
+var QUESTIONS = [
+ {key:"age", label:"Q1. 年代は？", multi:false, opts:[
+   {t:"20代", w:{saving:3,fukuri:3,nisa:3,emergency:3,humancapital:2,risktol:2,kakeibo:2}},
+   {t:"30〜40代", w:{hitsuyohosho:3,kyoiku_hi:2,loan:2,nisa:2,ideco:2,hoken_seimei:2,kabe:1}},
+   {t:"50代", w:{rougo:3,ideco:3,taishoku_kojo:3,dc_uketori:3,kurisage:2,torikuzushi:2,kaigo_cost:2,souzokuzei:2}},
+   {t:"60代以上", w:{kurisage:3,torikuzushi:3,zaishoku:3,nini:3,kenkoujumyo:2,ninchi_toketsu:2,yuigon:2}}]},
+ {key:"fam", label:"Q2. 家族は？", multi:false, opts:[
+   {t:"独身", w:{emergency:2,shogai_nenkin:2,shunyuhosho:2,ideco:2}},
+   {t:"夫婦（子なし）", w:{hitsuyohosho:2,izoku:2,kakyunenkin:1,pairloan:1}},
+   {t:"子育て中", w:{kyoiku_hi:3,jido:3,hoken_seimei:3,shogakukin:2,izoku:2,kyoiku_ikkatsu:1}},
+   {t:"子は独立", w:{rougo:2,souzokuzei:2,yuigon:2,kenkoujumyo:1}}]},
+ {key:"home", label:"Q3. 住まいは？", multi:false, opts:[
+   {t:"賃貸", w:{emergency:1,kasai:1,jishin_risk:1}},
+   {t:"購入を検討中", w:{loan:3,kinri:3,danshin:3,jyutakukojo:3,pairloan:2,jishin_risk:2,kasai:2}},
+   {t:"持ち家（ローン返済中）", w:{kinri:2,jyutakukojo:2,danshin:2,hoken_seimei:1}},
+   {t:"持ち家（完済）／実家", w:{reverse:1,souzokuzei:1,jishin_risk:1}}]},
+ {key:"job", label:"Q4. 働き方は？", multi:false, opts:[
+   {t:"会社員・公務員", w:{shaho:2,kosei:2,dc:2,kabe:1,shobyo:1}},
+   {t:"自営業・経営者", w:{shokibo:3,aozora:3,shobyo:3,shunyuhosho:3,kosei:2,ideco:2}},
+   {t:"パート・専業", w:{kabe:3,kosei:2,jido:1}},
+   {t:"リタイア済み", w:{nenkin:2,nini:2,zaishoku:2,torikuzushi:2}}]},
+ {key:"care", label:"Q5. 気になることは？（複数OK）", multi:true, opts:[
+   {t:"貯蓄・投資", w:{nisa:3,assetalloc:3,fukuri:2,ideco:2,risktol:2,jisshitsu:1}},
+   {t:"保険の見直し", w:{hitsuyohosho:3,kougaku:3,hoken_iryo:2,shunyuhosho:2,hoken_seimei:2}},
+   {t:"住宅", w:{loan:2,kinri:2,jyutakukojo:2}},
+   {t:"教育費", w:{kyoiku_hi:3,shogakukin:2,jido:2}},
+   {t:"老後・年金", w:{nenkin:3,rougo:3,kurisage:2,torikuzushi:2,daigae:1}},
+   {t:"相続・実家", w:{souzokuzei:3,yuigon:3,hoken_hikazei:2,shintaku:2,ninchi_toketsu:2}},
+   {t:"税金・働き方", w:{kabe:3,shotokuzei:2,furusato:2,aozora:1}}]}
+];
+var diagEl=document.getElementById("diag"), qsEl=document.getElementById("qs");
+function openDiag(){
+  qsEl.innerHTML = QUESTIONS.map(function(q,qi){
+    return '<h3>'+q.label+'</h3><div class="opts">'
+      + q.opts.map(function(o,oi){ return '<span class="opt" data-q="'+qi+'" data-o="'+oi+'">'+o.t+'</span>'; }).join("")
+      + '</div>';
+  }).join("");
+  qsEl.querySelectorAll(".opt").forEach(function(el){
+    el.addEventListener("click", function(){
+      var q=QUESTIONS[+el.dataset.q];
+      if(!q.multi){ qsEl.querySelectorAll('.opt[data-q="'+el.dataset.q+'"]').forEach(function(x){x.classList.remove("on");}); el.classList.add("on"); }
+      else el.classList.toggle("on");
+    });
+  });
+  diagEl.style.display="block";
+}
+document.getElementById("diagCancel").addEventListener("click", function(){ diagEl.style.display="none"; });
+document.getElementById("diagGo").addEventListener("click", function(){
+  var score={};
+  qsEl.querySelectorAll(".opt.on").forEach(function(el){
+    var w=QUESTIONS[+el.dataset.q].opts[+el.dataset.o].w;
+    Object.keys(w).forEach(function(id){ score[id]=(score[id]||0)+w[id]; });
+  });
+  var ranked=Object.keys(score).filter(function(id){return byId[id];})
+    .sort(function(a,b){ return score[b]-score[a] || byId[a].lv-byId[b].lv; });
+  if(!ranked.length){ diagEl.style.display="none"; return; }
+  diagEl.style.display="none";
+  applyConstellation(ranked.slice(0,12));
+});
+function applyConstellation(ids){
+  mode="con"; selected=null; conRank=ids.slice(); clearHL();
+  ids.forEach(function(id){ actN[id]=true; });
+  links.forEach(function(l){
+    var a=l.source.id||l.source, b=l.target.id||l.target;
+    if(actN[a]&&actN[b]) actL[a<b?a+"|"+b:b+"|"+a]=true;
+  });
+  maxLv=5; syncLvBtns();
+  Graph.nodeVisibility(Graph.nodeVisibility()); Graph.linkVisibility(Graph.linkVisibility());
+  var groups=[["🥇 今すぐ向き合う",ids.slice(0,3),"rank1"],["🥈 次の一手",ids.slice(3,7),""],["📚 知っておくと違う",ids.slice(7,12),""]];
+  panel.innerHTML = '<h2>⭐ あなたの優先星座</h2>'
+    + '<div class="meta">回答から優先テーマ '+ids.length+' 個を抽出しました</div>'
+    + groups.map(function(g){ if(!g[1].length) return "";
+        return '<h3>'+g[0]+'</h3><div>'+g[1].map(function(id){ var m=byId[id];
+          return '<span class="chip '+g[2]+'" data-id="'+id+'" style="border-color:'+LV[m.lv]+'">'+m.label+'</span>'; }).join("")+'</div>'; }).join("")
+    + '<p class="hint" style="margin-top:12px">チップをタップすると解説へ。この画面のまま、FP面談・セミナーの「今日はどこから話すか」の合意にも使えます。</p>'
+    + '<button class="pbtn" id="pReset">🌌 宇宙全体に戻る</button>';
+  panel.querySelectorAll(".chip").forEach(function(c){ c.addEventListener("click", function(){ var m=byId[c.dataset.id]; selectNode(m); flyTo(m); }); });
+  document.getElementById("pReset").addEventListener("click", clearAll);
+  Graph.cameraPosition({x:0,y:50,z:620}, {x:0,y:0,z:0}, 1500);
+  restyle();
+}
+
+// ---- レベルフィルタ ----
+var lvbtns=document.getElementById("lvbtns");
+[["1","基本のみ"],["2","〜FP級"],["3","〜実務"],["4","〜専門家"],["5","全宇宙"]].forEach(function(pair){
+  var b=document.createElement("button");
+  b.className="lvbtn"+(pair[0]==="5"?" active":""); b.textContent="L"+pair[0]+" "+pair[1]; b.dataset.lv=pair[0];
+  b.addEventListener("click", function(){
+    maxLv=+pair[0]; syncLvBtns();
+    if(mode==="node" && selected && selected.lv>maxLv) clearAll();
+    Graph.nodeVisibility(Graph.nodeVisibility());
+    Graph.linkVisibility(Graph.linkVisibility());
+    restyle();
+  });
+  lvbtns.appendChild(b);
+});
+var db=document.createElement("button");
+db.className="lvbtn diag"; db.textContent="🧭 わたしの優先マップ診断";
+db.addEventListener("click", openDiag);
+lvbtns.appendChild(db);
+function syncLvBtns(){ lvbtns.querySelectorAll(".lvbtn").forEach(function(x){ if(x.dataset.lv) x.classList.toggle("active", x.dataset.lv==String(maxLv)); }); }
+
+// ---- 検索 ----
+document.getElementById("search").addEventListener("input", function(e){
+  var q=e.target.value.trim(); if(!q) return;
+  var hit=nodes.find(function(n){ return n.lv<=maxLv && (n.label.indexOf(q)>=0 || n.desc.indexOf(q)>=0); });
+  if(hit){ selectNode(hit); flyTo(hit); }
+});
+
+// ---- 自動回転 ----
+var controls=Graph.controls();
+controls.autoRotate=true; controls.autoRotateSpeed=0.55;
+var idleT;
+function wake(){ controls.autoRotate=false; clearTimeout(idleT); idleT=setTimeout(function(){controls.autoRotate=true;},18000); }
+elGraph.addEventListener("pointerdown",wake);
+elGraph.addEventListener("wheel",wake,{passive:true});
+
+// ---- イントロ ----
+Graph.cameraPosition({x:0,y:60,z:1500});
+setTimeout(function(){ Graph.cameraPosition({x:0,y:50,z:560}, undefined, 2800); }, 500);
+window.addEventListener("resize", function(){ Graph.width(innerWidth); Graph.height(innerHeight); });
+
+guide();
+restyle();
+var ld=document.getElementById("loading");
+setTimeout(function(){ ld.style.opacity=0; setTimeout(function(){ld.remove();},850); }, 600);
+})();
 </script>
 </body>
 </html>
