@@ -72,7 +72,12 @@
   #caption b { color:#ffd479; font-size:16px; }
   #caption .cap-body { margin-top:6px; font-size:13px; color:#d5deea; line-height:1.8; }
   #stopBtn { display:none; position:absolute; top:14px; right:14px; z-index:21; padding:8px 16px; }
-  body.touring #stopBtn { display:block; }
+  body.touring #stopBtn { display:block; top:calc(7vh + 12px); }
+  /* シネマ黒帯（ツアー中に上下からスライドイン） */
+  #barTop,#barBottom { position:absolute; left:0; right:0; height:0; background:#000; z-index:15; transition:height .9s ease; pointer-events:none; }
+  #barTop{top:0} #barBottom{bottom:0}
+  body.touring #barTop, body.touring #barBottom { height:7vh; }
+  body.touring #caption { bottom:calc(7vh + 16px); }
   @media (max-width:900px){ #panel{ width:min(86vw,330px); top:auto; max-height:46vh; } #toolbar{ max-width:78vw; } }
 </style>
 </head>
@@ -99,6 +104,7 @@
 
 <div id="tip" class="glass"></div>
 <div id="caption" class="glass"></div>
+<div id="barTop"></div><div id="barBottom"></div>
 <button id="stopBtn" class="lvbtn diag glass">⏸ ツアー停止</button>
 
 <div id="loading"><div class="orb"></div><div class="txt">加藤OS を起動しています…</div></div>
@@ -324,6 +330,7 @@ function selectNode(n){
     + '<h3>🔗 影響しあう要素（'+neighbors.length+'）</h3>'
     + '<div>'+neighbors.map(function(m){var c=m.os?GOLD:LV[m.lv];return '<span class="chip" data-id="'+m.id+'" style="border-color:'+c+'">'+m.label+' <small style="color:'+c+'">'+(m.os?'OS':'L'+m.lv)+'</small></span>';}).join("")+'</div>';
   panel.querySelectorAll(".chip").forEach(function(c){ c.addEventListener("click", function(){ var m=byId[c.dataset.id]; selectNode(m); flyTo(m); }); });
+  spawnShock(n);   // 選択の瞬間に金の衝撃波リング
   restyle();
 }
 function flyTo(n, ms){
@@ -581,6 +588,150 @@ trailBtn.addEventListener("click", function(){
   trailBtn.textContent=trail.on? "✨ 残像 ON":"✨ 残像 OFF";
 });
 lvbtns.appendChild(trailBtn);
+
+// ---- アートFX：スターウォーズ級演出＆流体 ----
+var fx={on:true, wisps:null, wispPos:null, wispGeo:null, streaks:null, streakMat:null, streakSeeds:[], shocks:[], nebulaGrp:null, baseFov:null};
+
+// 絵の具星雲（加算合成スプライト）
+function nebulaTexture(seedHue){
+  var c=document.createElement("canvas"); c.width=c.height=512;
+  var x=c.getContext("2d");
+  for(var i=0;i<46;i++){
+    var px=100+Math.random()*312, py=100+Math.random()*312, pr=30+Math.random()*130;
+    var hue=seedHue+(Math.random()-0.5)*60, sat=60+Math.random()*30, li=28+Math.random()*22;
+    var g=x.createRadialGradient(px,py,0,px,py,pr);
+    g.addColorStop(0,"hsla("+hue+","+sat+"%,"+li+"%,0.10)");
+    g.addColorStop(1,"hsla("+hue+","+sat+"%,"+li+"%,0)");
+    x.fillStyle=g; x.beginPath(); x.arc(px,py,pr,0,7); x.fill();
+  }
+  var m=x.createRadialGradient(256,256,120,256,256,256);
+  x.globalCompositeOperation="destination-in";
+  m.addColorStop(0,"rgba(0,0,0,1)"); m.addColorStop(1,"rgba(0,0,0,0)");
+  x.fillStyle=m; x.fillRect(0,0,512,512);
+  return new THREE.CanvasTexture(c);
+}
+(function(){
+  fx.nebulaGrp=new THREE.Group();
+  var hues=[225,265,45,205,285,35];   // 藍・紫・金
+  for(var i=0;i<6;i++){
+    var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:nebulaTexture(hues[i]), blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.8}));
+    var R=1500+Math.random()*600, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    sp.position.set(R*Math.sin(ph)*Math.cos(th), R*Math.sin(ph)*Math.sin(th)*0.6, R*Math.cos(ph));
+    var s=900+Math.random()*900; sp.scale.set(s,s,1);
+    fx.nebulaGrp.add(sp);
+  }
+  scene.add(fx.nebulaGrp);
+})();
+
+// 流体ウィスプ（渦の流線。残像ONと合わせると絵の具の流体実験風）
+(function(){
+  var N=1300;
+  fx.wispPos=new Float32Array(N*3); var col=new Float32Array(N*3);
+  for(var i=0;i<N;i++){
+    var R=Math.pow(Math.random(),0.5)*720, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    fx.wispPos[i*3]=R*Math.sin(ph)*Math.cos(th); fx.wispPos[i*3+1]=R*Math.sin(ph)*Math.sin(th)*0.7; fx.wispPos[i*3+2]=R*Math.cos(ph);
+    var gold=Math.random()<0.22;   // 2割は加藤OSの金
+    col[i*3]=gold?1.0:0.35+Math.random()*0.2; col[i*3+1]=gold?0.83:0.5+Math.random()*0.25; col[i*3+2]=gold?0.45:0.95;
+  }
+  fx.wispGeo=new THREE.BufferGeometry();
+  fx.wispGeo.setAttribute("position", new THREE.BufferAttribute(fx.wispPos,3));
+  fx.wispGeo.setAttribute("color", new THREE.BufferAttribute(col,3));
+  fx.wisps=new THREE.Points(fx.wispGeo, new THREE.PointsMaterial({size:2.0, vertexColors:true, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false}));
+  fx.wisps.frustumCulled=false;
+  scene.add(fx.wisps);
+})();
+
+// ハイパースペース光条（カメラが速く動くほど星が線に伸びる）
+(function(){
+  var SN=240;
+  for(var i=0;i<SN;i++) fx.streakSeeds.push({x:(Math.random()-0.5)*700, y:(Math.random()-0.5)*700, z:-60-Math.random()*820});
+  var g=new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(SN*2*3),3));
+  fx.streakMat=new THREE.LineBasicMaterial({color:0xcfe2ff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false});
+  fx.streaks=new THREE.LineSegments(g, fx.streakMat);
+  fx.streaks.visible=false; fx.streaks.frustumCulled=false;
+  Graph.camera().add(fx.streaks);
+})();
+
+// 到着・選択の衝撃波リング
+var ringTexCache=null;
+function ringTexture(){
+  if(ringTexCache) return ringTexCache;
+  var c=document.createElement("canvas"); c.width=c.height=256; var x=c.getContext("2d");
+  var g=x.createRadialGradient(128,128,80,128,128,128);
+  g.addColorStop(0,"rgba(255,220,140,0)");
+  g.addColorStop(0.75,"rgba(255,224,150,0.9)");
+  g.addColorStop(1,"rgba(255,224,150,0)");
+  x.fillStyle=g; x.fillRect(0,0,256,256);
+  ringTexCache=new THREE.CanvasTexture(c); return ringTexCache;
+}
+function spawnShock(n){
+  if(!fx.on) return;
+  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:ringTexture(), transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false}));
+  sp.position.set(n.x||0, n.y||0, n.z||0);
+  fx.shocks.push({sp:sp, t:performance.now(), r:(n.__r||6)});
+  scene.add(sp);
+}
+
+// FXループ（毎フレーム：流体・光条・FOVパンチ・衝撃波）
+var prevCam=null;
+(function fxLoop(){
+  requestAnimationFrame(fxLoop);
+  var cam=Graph.camera(); if(!cam) return;
+  var t=performance.now()*0.001;
+  if(!prevCam){ prevCam=cam.position.clone(); fx.baseFov=cam.fov; }
+  var speed=cam.position.distanceTo(prevCam); prevCam.copy(cam.position);
+  if(fx.on){
+    // 流体ウィスプ：三重の正弦流れ場で渦を巻く
+    var p=fx.wispPos;
+    for(var i=0;i<p.length;i+=3){
+      var X=p[i],Y=p[i+1],Z=p[i+2];
+      p[i]  += (Math.sin(0.0042*Y + t*0.30) + 0.5*Math.sin(0.0023*Z - t*0.17))*0.55;
+      p[i+1]+= (Math.sin(0.0042*Z + t*0.26) + 0.5*Math.sin(0.0023*X + t*0.19))*0.45;
+      p[i+2]+= (Math.sin(0.0042*X + t*0.22) + 0.5*Math.sin(0.0023*Y - t*0.13))*0.55;
+      if(X*X+Y*Y+Z*Z > 1000000){ p[i]*=0.02; p[i+1]*=0.02; p[i+2]*=0.02; }
+    }
+    fx.wispGeo.attributes.position.needsUpdate=true;
+    fx.nebulaGrp.rotation.y = t*0.008;
+  }
+  // 光条：速度でフェードイン、長さも速度比例
+  var want = fx.on ? Math.min(Math.max((speed-1.2)*0.16,0),0.9) : 0;
+  fx.streakMat.opacity += (want-fx.streakMat.opacity)*0.18;
+  fx.streaks.visible = fx.streakMat.opacity>0.02;
+  if(fx.streaks.visible){
+    var len=Math.min(speed*4.5,120)+8;
+    var arr=fx.streaks.geometry.attributes.position.array;
+    for(var j=0;j<fx.streakSeeds.length;j++){
+      var s=fx.streakSeeds[j];
+      s.z += speed*3.2;
+      if(s.z>-30){ s.z=-700-Math.random()*250; s.x=(Math.random()-0.5)*700; s.y=(Math.random()-0.5)*700; }
+      var k=j*6;
+      arr[k]=s.x; arr[k+1]=s.y; arr[k+2]=s.z;
+      arr[k+3]=s.x; arr[k+4]=s.y; arr[k+5]=s.z-len;
+    }
+    fx.streaks.geometry.attributes.position.needsUpdate=true;
+  }
+  // FOVパンチ（速いほど視野が広がる＝ワープ加速感）
+  var targetFov=(fx.baseFov||75) + (fx.on? Math.min(speed*1.6,26):0);
+  if(Math.abs(cam.fov-targetFov)>0.05){ cam.fov += (targetFov-cam.fov)*0.12; cam.updateProjectionMatrix(); }
+  // 衝撃波リング：0.9秒で拡大しながら消える
+  for(var q=fx.shocks.length-1;q>=0;q--){
+    var sh=fx.shocks[q], age=(performance.now()-sh.t)/900;
+    if(age>=1){ scene.remove(sh.sp); fx.shocks.splice(q,1); continue; }
+    var sc=sh.r*(1+age*26);
+    sh.sp.scale.set(sc,sc,1); sh.sp.material.opacity=0.85*(1-age);
+  }
+})();
+
+var artBtn=document.createElement("button");
+artBtn.className="lvbtn diag"; artBtn.textContent="🎨 アートFX ON";
+artBtn.addEventListener("click", function(){
+  fx.on=!fx.on;
+  fx.nebulaGrp.visible=fx.on; fx.wisps.visible=fx.on;
+  if(!fx.on) fx.streaks.visible=false;
+  artBtn.textContent=fx.on? "🎨 アートFX ON":"🎨 アートFX OFF";
+});
+lvbtns.appendChild(artBtn);
 
 // ---- イントロ ----
 Graph.cameraPosition({x:0,y:60,z:1500});
