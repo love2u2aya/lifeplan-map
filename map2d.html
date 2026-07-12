@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ライフプランニング全体マップ — 要素の相互影響</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; background:#12161d; color:#e8eaed; overflow:hidden; }
+  #app { display:flex; height:100vh; }
+  #map { flex:1; position:relative; cursor:grab; }
+  #map.dragging { cursor:grabbing; }
+  svg { width:100%; height:100%; display:block; }
+  #panel { width:340px; background:#1a2028; border-left:1px solid #2b3442; padding:16px; overflow-y:auto; flex-shrink:0; }
+  #toolbar { position:absolute; top:12px; left:12px; z-index:10; background:rgba(20,26,34,.92); border:1px solid #2b3442; border-radius:10px; padding:10px 12px; max-width:520px; }
+  #toolbar h1 { font-size:14px; margin-bottom:8px; color:#ffd479; }
+  .lvbtns { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .lvbtn { border:1px solid #3a4556; background:#222b36; color:#cfd6df; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer; }
+  .lvbtn.active { background:#3d5a80; border-color:#6ea8d8; color:#fff; }
+  #search { width:100%; padding:6px 8px; border-radius:6px; border:1px solid #3a4556; background:#222b36; color:#e8eaed; font-size:13px; }
+  .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; font-size:11px; color:#aab3bf; }
+  .legend span { display:inline-flex; align-items:center; gap:4px; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .node { cursor:pointer; }
+  .node circle { stroke:#0d1116; stroke-width:1.5; transition:opacity .15s; }
+  .node text { fill:#dfe4ea; font-size:15px; pointer-events:none; paint-order:stroke; stroke:#12161d; stroke-width:3px; }
+  .node.dim { opacity:.12; }
+  .node.sel circle { stroke:#ffd479; stroke-width:4; }
+  .edge { stroke:#54637a; stroke-opacity:.28; fill:none; transition:all .15s; }
+  .edge.hl { stroke:#ffd479; stroke-opacity:.95; stroke-width:3.5; }
+  .edge.dim { stroke-opacity:.04; }
+  .cluster-label { fill:#8fa0b5; font-size:26px; font-weight:bold; opacity:.85; }
+  #panel h2 { font-size:17px; color:#ffd479; margin-bottom:6px; }
+  #panel .meta { font-size:12px; color:#9aa5b1; margin-bottom:10px; }
+  #panel .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; color:#fff; margin-right:6px; }
+  #panel p { font-size:13px; line-height:1.7; margin-bottom:14px; }
+  #panel h3 { font-size:13px; color:#8fa0b5; margin-bottom:8px; }
+  .chip { display:inline-block; margin:0 6px 6px 0; padding:4px 10px; background:#243040; border:1px solid #3a4a5f; border-radius:14px; font-size:12px; cursor:pointer; color:#cfe0f0; }
+  .chip:hover { background:#31435a; }
+  .hint { color:#7a8694; font-size:12px; line-height:1.7; }
+  #zoombtns { position:absolute; bottom:14px; left:14px; z-index:10; display:flex; flex-direction:column; gap:6px; }
+  #zoombtns button { width:34px; height:34px; border-radius:8px; border:1px solid #3a4556; background:#222b36; color:#e8eaed; font-size:18px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map">
+    <div id="toolbar">
+      <h1>🧭 ライフプランニング全体マップ（クリックで相互影響を表示）</h1>
+      <div class="lvbtns" id="lvbtns"></div>
+      <input id="search" type="text" placeholder="🔍 要素名で検索（例: 年金 / NISA / 相続）">
+      <div class="legend">
+        <span><i class="dot" style="background:#4caf7d"></i>L1 基本</span>
+        <span><i class="dot" style="background:#4a90d9"></i>L2 FP3〜2級</span>
+        <span><i class="dot" style="background:#9068d9"></i>L3 実務・FP1級</span>
+        <span><i class="dot" style="background:#e8944a"></i>L4 専門家</span>
+        <span><i class="dot" style="background:#e05c7a"></i>L5 超マニア・学問</span>
+      </div>
+    </div>
+    <div id="zoombtns">
+      <button id="zin">＋</button>
+      <button id="zout">−</button>
+      <button id="zfit" title="全体表示">⌂</button>
+    </div>
+    <svg id="svg"><g id="view"></g></svg>
+  </div>
+  <div id="panel">
+    <h2>使い方</h2>
+    <p class="hint">
+      ● ノード（丸）をクリック → その要素が<b>何と影響しあうか</b>が金色の線で光り、ここに解説が出ます。<br><br>
+      ● 上のボタンで「マニアック度」を絞れます（L1だけ→基本のみ、L5まで→全部）。<br><br>
+      ● ドラッグで移動、ホイール／±ボタンで拡大縮小。<br><br>
+      ● 丸の色＝マニアック度、置き場所＝分野です。真ん中の「計画・全体」がすべてのハブ。
+    </p>
+  </div>
+</div>
+<script>
+const DOMAINS = {
+  income:  {name:"収入・キャリア",   x:340,  y:340},
+  spend:   {name:"支出・家計",       x:900,  y:300},
+  edu:     {name:"教育・子育て",     x:1460, y:300},
+  invest:  {name:"貯蓄・投資",       x:2020, y:340},
+  econ:    {name:"経済・制度環境",   x:2560, y:340},
+  tax:     {name:"税金",             x:340,  y:950},
+  social:  {name:"社会保険・公的年金",x:900, y:1000},
+  plan:    {name:"計画・全体",       x:1460, y:950},
+  housing: {name:"住宅・不動産",     x:2020, y:950},
+  old:     {name:"老後・介護・相続", x:2560, y:1000},
+  mind:    {name:"心理・行動",       x:340,  y:1560},
+  ins:     {name:"民間保険",         x:900,  y:1620},
+  law:     {name:"法律・権利",       x:1460, y:1620},
+  health:  {name:"健康・寿命",       x:2020, y:1620},
+  theory:  {name:"理論・周辺学問",   x:2560, y:1620},
+};
+const LVCOLOR = {1:"#4caf7d",2:"#4a90d9",3:"#9068d9",4:"#e8944a",5:"#e05c7a"};
+
+// links は「相互に影響しあう相手」（無向）
+const NODES = [
+// ===== L1 基本 =====
+{id:"income",lv:1,dom:"income",label:"収入",desc:"すべての起点。額面ではなく手取り（可処分所得）で考えるのが第一歩。収入の安定性（会社員/自営業）は保険・住宅ローン・投資方針すべてに波及する。",links:["kashobun","expense","saving","cf","shaho","shotokuzei","humancapital"]},
+{id:"taishoku",lv:1,dom:"income",label:"退職金",desc:"老後資金の柱のひとつ。受け取り方（一時金/年金）で税金が大きく変わるため、退職所得控除・DCとの受取順序と必ずセットで考える。",links:["rougo","taishoku_kojo","dc_uketori","cf"]},
+{id:"expense",lv:1,dom:"spend",label:"支出",desc:"固定費と変動費に分解して把握する。支出の最適化は「確実にリターンが出る投資」であり、貯蓄率を通じて資産形成スピードを直接決める。",links:["kakeibo","saving","cf","inflation","income"]},
+{id:"kakeibo",lv:1,dom:"spend",label:"家計簿・家計管理",desc:"現状把握のツール。キャッシュフロー表・家計バランスシートの入力データになる。完璧より継続が大事。",links:["expense","cf","balance"]},
+{id:"lifeevent",lv:1,dom:"plan",label:"ライフイベント表",desc:"結婚・出産・住宅・教育・退職などの発生時期と概算費用を時系列に並べた表。キャッシュフロー表の骨格になる。",links:["cf","kyoiku_hi","loan","rougo"]},
+{id:"cf",lv:1,dom:"plan",label:"キャッシュフロー表",desc:"ライフプランニングの中心成果物。毎年の収入−支出−イベント費用を将来まで並べ、貯蓄残高がマイナスにならないか確認する。ほぼ全要素がここに流れ込む。",links:["income","expense","lifeevent","balance","montecarlo","kingaku6","inflation","rougo"]},
+{id:"emergency",lv:1,dom:"invest",label:"生活防衛資金",desc:"生活費の6か月〜2年分の現金クッション。これがあると投資でリスクを取れ、失業・病気時に資産の狼狽売りを防げる。",links:["saving","risktol","shitsugyo","shobyo"]},
+{id:"saving",lv:1,dom:"invest",label:"貯蓄",desc:"収入−支出の残り。貯蓄率こそ資産形成の最重要変数で、利回りより効く時期（若年期）が長い。",links:["income","expense","emergency","nisa","fukuri","cf"]},
+{id:"hoken_seimei",lv:1,dom:"ins",label:"生命保険（死亡保障）",desc:"遺された家族の生活費を守る保障。必要保障額は遺族年金・配偶者の収入・住宅ローン団信でカバーされる分を引いて決める（＝入りすぎ防止）。",links:["hitsuyohosho","izoku","danshin","hoken_hikazei","kyoiku_hi"]},
+{id:"hoken_iryo",lv:1,dom:"ins",label:"医療保険",desc:"入院・手術に備える保険。ただし高額療養費制度で自己負担には上限があるため、公的保障を知ってから必要最小限を選ぶのが鉄則。",links:["kougaku","emergency","senshiniryo","shobyo"]},
+{id:"loan",lv:1,dom:"housing",label:"住宅ローン",desc:"人生最大の負債。金利タイプ・借入額・期間の選択が数百万円の差を生む。団信により生命保険の代替効果もある。",links:["kinri","danshin","jyutakukojo","pairloan","cf","lifeevent","reverse"]},
+{id:"nenkin",lv:1,dom:"social",label:"公的年金",desc:"老後収入の土台であり、実は「終身の収入保障＋遺族保障＋障害保障」の3機能を持つ保険。老後資金の必要額は年金額を引いてから計算する。",links:["kosei","rougo","izoku","shogai_nenkin","kurisage","macroslide"]},
+{id:"kyoiku_hi",lv:1,dom:"edu",label:"教育費",desc:"進路（公立/私立/理系/留学）で1人1,000万〜2,500万円超と幅が大きい。ピークが住宅ローンや老後準備と重なるのが最大の難所。",links:["lifeevent","jido","shogakukin","hoken_seimei","cf"]},
+{id:"rougo",lv:1,dom:"old",label:"老後資金",desc:"「年金で足りない分×余命」で決まる。必要額はインフレ・健康状態・住居費で大きく変動し、取り崩し方で寿命が変わる資産でもある。",links:["nenkin","taishoku","torikuzushi","kenkoujumyo","cf","inflation"]},
+{id:"inflation",lv:1,dom:"econ",label:"物価・インフレ",desc:"現金の実質価値を毎年削る見えないコスト。教育費・老後生活費の将来見積もりと、投資の実質リターン計算の前提になる。",links:["expense","cf","jisshitsu","rougo","kinri"]},
+// ===== L2 FP3〜2級 =====
+{id:"kashobun",lv:2,dom:"income",label:"可処分所得（手取り）",desc:"額面−税金−社会保険料。家計設計はすべて手取りベースで行う。昇給しても税・社保で手取りが増えにくい構造の理解が出発点。",links:["income","shotokuzei","shaho","cf"]},
+{id:"shitsugyo",lv:2,dom:"income",label:"雇用保険・失業給付",desc:"失業時の生活を支える公的保障。自己都合/会社都合で給付が変わる。転職・独立の計画やリスク許容度の判断材料になる。",links:["emergency","income","shaho"]},
+{id:"balance",lv:2,dom:"plan",label:"家計バランスシート",desc:"資産と負債の一覧表。住宅ローン残高と資産の純額（純資産）を見える化する。CF表が「フロー」、BSが「ストック」で両輪。",links:["cf","kakeibo","loan","saving"]},
+{id:"kingaku6",lv:2,dom:"plan",label:"6つの係数",desc:"終価・現価・年金終価・減債基金・資本回収・年金現価。将来必要額から毎年の積立額を逆算する等、ライフプラン計算の道具箱。",links:["cf","fukuri","torikuzushi"]},
+{id:"shotokuzei",lv:2,dom:"tax",label:"所得税・住民税の仕組み",desc:"累進課税と各種控除（基礎・配偶者・扶養・生保料控除など）。控除を使い切る発想が手取り改善の基本。",links:["kashobun","furusato","kabe","income","aozora"]},
+{id:"furusato",lv:2,dom:"tax",label:"ふるさと納税・所得控除の活用",desc:"医療費控除・iDeCo・ふるさと納税など、誰でも使える節税の入り口。上限額は所得と家族構成で決まる。",links:["shotokuzei","ideco"]},
+{id:"shaho",lv:2,dom:"social",label:"社会保険料",desc:"健康・厚生年金・雇用・労災・介護の5種。手取りを削る最大要因だが、見返り（年金額・傷病手当・遺族保障）とセットで損得を見る。",links:["kashobun","kosei","hyojun","kabe","income","shitsugyo"]},
+{id:"kosei",lv:2,dom:"social",label:"年金の3階建て構造",desc:"1階=国民年金、2階=厚生年金、3階=企業年金/iDeCo。働き方（会社員/自営業/専業）で階数が変わり、必要な自助努力の量が決まる。",links:["nenkin","shaho","ideco","dc","kabe"]},
+{id:"kougaku",lv:2,dom:"social",label:"高額療養費制度",desc:"医療費の自己負担月額に上限を設ける制度（所得で変動）。これを知ると民間医療保険の必要量が激減する、保険見直しの要。",links:["hoken_iryo","shobyo","senshiniryo"]},
+{id:"shobyo",lv:2,dom:"social",label:"傷病手当金",desc:"会社員が病気で働けない時、給与の約2/3を最長1年6か月受給。就業不能保険の必要性判断の前提になる（自営業にはない）。",links:["kougaku","shunyuhosho","emergency","hoken_iryo"]},
+{id:"izoku",lv:2,dom:"social",label:"遺族年金",desc:"稼ぎ手が亡くなった時の公的保障。子の有無・妻の年齢・厚生年金加入で額が大きく変わり、生命保険の必要額を直接左右する。",links:["nenkin","hitsuyohosho","hoken_seimei","kakyunenkin"]},
+{id:"shogai_nenkin",lv:2,dom:"social",label:"障害年金",desc:"病気・ケガで障害状態になった時の公的保障。就業不能リスクへの一次防衛線で、民間の就業不能保険はこの不足分を埋める位置づけ。",links:["nenkin","shunyuhosho"]},
+{id:"nisa",lv:2,dom:"invest",label:"NISA",desc:"運用益非課税の投資制度。流動性が高く（いつでも引き出せる）、教育費・住宅頭金にも転用可能。iDeCoとの優先順位判断が定番論点。",links:["saving","ideco","assetalloc","fukuri"]},
+{id:"ideco",lv:2,dom:"invest",label:"iDeCo",desc:"掛金が全額所得控除になる年金制度。節税効果は大きいが60歳まで引き出せず、受取時課税があるため出口（退職金との順序）まで設計が必要。",links:["nisa","kosei","furusato","dc_uketori","taishoku_kojo"]},
+{id:"fukuri",lv:2,dom:"invest",label:"複利",desc:"「時間×利回り」の掛け算で資産が雪だるま式に増える原理。若いほど時間の価値が大きい＝早く始めることが最大の武器。",links:["saving","nisa","kingaku6","jisshitsu"]},
+{id:"assetalloc",lv:2,dom:"invest",label:"アセットアロケーション",desc:"株式・債券・現金・不動産などへの配分。リターンの9割を決めると言われる意思決定。年齢・人的資本・リスク許容度から導く。",links:["risktol","nisa","humancapital","jisshitsu","sequence"]},
+{id:"risktol",lv:2,dom:"invest",label:"リスク許容度",desc:"収入の安定性・防衛資金・家族構成・性格で決まる「下落に耐えられる度合い」。ここを見誤ると暴落時に狼狽売りして計画が崩壊する。",links:["assetalloc","emergency","behavior","humancapital"]},
+{id:"hitsuyohosho",lv:2,dom:"ins",label:"必要保障額の計算",desc:"遺族の支出総額−（遺族年金＋配偶者収入＋資産＋団信）＝民間保険で埋める額。ライフステージで減っていくため定期的な見直しが必須。",links:["hoken_seimei","izoku","danshin","kyoiku_hi","shunyuhosho"]},
+{id:"kasai",lv:2,dom:"ins",label:"火災・地震保険",desc:"持ち家の必須保険。地震保険は火災保険の50%までしか掛けられない公共的制度。住宅購入とセットで発生する固定費。",links:["loan","jishin_risk"]},
+{id:"danshin",lv:2,dom:"housing",label:"団体信用生命保険",desc:"ローン契約者死亡でローンが消える保険。実質的に巨額の生命保険であり、住宅購入後は民間生保を減額できることが多い（がん団信等の特約比較も論点）。",links:["loan","hoken_seimei","hitsuyohosho"]},
+{id:"kinri",lv:2,dom:"housing",label:"金利タイプ・繰上返済",desc:"変動/固定の選択は金利環境と家計の耐性で決める。繰上返済は「確実な利回り」だが、住宅ローン控除・手元流動性とのトレードオフ。",links:["loan","inflation","jyutakukojo","kinyu_seisaku"]},
+{id:"jido",lv:2,dom:"edu",label:"児童手当・子育て支援",desc:"児童手当・保育無償化・高校無償化など。所得制限の有無が制度ごとに違い、年収の壁と絡んで世帯の働き方設計に影響する。",links:["kyoiku_hi","kabe"]},
+// ===== L3 実務・FP1級 =====
+{id:"rsu",lv:3,dom:"income",label:"RSU・ストックオプション",desc:"株式報酬。付与・権利確定・売却の各時点で課税関係が異なり、自社株集中リスク（収入も資産も同じ会社）の管理が必要。",links:["income","assetalloc","shotokuzei"]},
+{id:"shokibo",lv:3,dom:"income",label:"小規模企業共済・経営セーフティ",desc:"自営業・経営者の「退職金づくり＋節税」の定番。全額所得控除で、iDeCoと並ぶ自営業の老後対策の柱。",links:["aozora","taishoku_kojo","kosei"]},
+{id:"montecarlo",lv:3,dom:"plan",label:"モンテカルロ・シミュレーション",desc:"利回りを固定値でなく確率分布で扱い、数千通りの人生をシミュレーションして「資金が尽きない確率」を出す手法。CF表の進化版。",links:["cf","sequence","torikuzushi","lifecycle_opt"]},
+{id:"jisshitsu",lv:3,dom:"invest",label:"実質収益率",desc:"名目リターン−インフレ率。老後30年の計画では名目と実質の混同が致命傷になる。表面利回りに騙されないための基礎概念。",links:["inflation","fukuri","assetalloc","cf"]},
+{id:"dc",lv:3,dom:"invest",label:"企業型DC・マッチング拠出",desc:"会社の年金制度。iDeCoとの併用可否、事業主掛金との兼ね合い、デフォルト商品（元本確保型に放置）問題など実務論点が多い。",links:["kosei","ideco","dc_uketori"]},
+{id:"kabe",lv:3,dom:"tax",label:"年収の壁（103/106/130万等）",desc:"税と社会保険で「壁」の意味が違う。社保加入は負担増だが年金・傷病手当が付く「投資」の面もあり、単純な損得で語れない。世帯の働き方設計の中心論点。",links:["shotokuzei","shaho","kosei","jido","hyojun"]},
+{id:"jyutakukojo",lv:3,dom:"tax",label:"住宅ローン控除",desc:"年末残高の一定率を税額控除。繰上返済との損得、ペアローンでの枠2倍、省エネ基準での上限差など、住宅の資金計画と直結。",links:["loan","kinri","pairloan","shotokuzei"]},
+{id:"taishoku_kojo",lv:3,dom:"tax",label:"退職所得控除",desc:"勤続年数×40万（20年超は70万）が非課税になる強力な控除。iDeCo・小規模企業共済・退職金の受取タイミングをずらす設計の核。",links:["taishoku","ideco","shokibo","dc_uketori","rule5_19"]},
+{id:"souzokuzei",lv:3,dom:"tax",label:"相続税・生前贈与",desc:"基礎控除3,000万＋600万×法定相続人。暦年贈与vs相続時精算課税の選択、贈与加算期間の延長など、親世代の資産と自分のプランを繋ぐ論点。",links:["yuigon","hoken_hikazei","shintaku","kyoiku_ikkatsu","digital"]},
+{id:"aozora",lv:3,dom:"tax",label:"青色申告・副業の税務",desc:"個人事業の税務基盤。65万円控除・経費・損益通算。副業収入の伸びは「収入の複線化」としてリスク許容度も引き上げる。",links:["shotokuzei","shokibo","income"]},
+{id:"kurisage",lv:3,dom:"social",label:"年金の繰上げ・繰下げ",desc:"受給開始を60〜75歳で選べ、繰下げは1か月+0.7%（75歳で+84%）。損益分岐は寿命次第で、健康状態・資産・就労と合わせた出口設計の中心。",links:["nenkin","kenkoujumyo","zaishoku","torikuzushi","tontine"]},
+{id:"zaishoku",lv:3,dom:"social",label:"在職老齢年金",desc:"働きながら厚生年金を受けると、賃金+年金が基準額超で年金が減額。シニアの働き方と受給戦略に直結する。",links:["kurisage","income","nenkin"]},
+{id:"kakyunenkin",lv:3,dom:"social",label:"加給年金・振替加算",desc:"年下配偶者がいると年金に「家族手当」が付く制度。繰下げすると加給年金を失うなど、夫婦の年齢差で最適解が変わる盲点。",links:["nenkin","kurisage","izoku"]},
+{id:"pairloan",lv:3,dom:"housing",label:"ペアローン・収入合算",desc:"夫婦で借りて借入額と控除枠を増やす手法。ただし離婚・死亡・産休時に脆く、団信が片方にしか効かないリスク構造の理解が必須。",links:["loan","jyutakukojo","rikon","danshin"]},
+{id:"reverse",lv:3,dom:"housing",label:"リバースモーゲージ・リースバック",desc:"自宅を担保に老後資金を借りる/売って住み続ける手法。老後資金不足の最終手段だが、金利・長生き・地価下落のリスクを負う。",links:["loan","rougo","kaigo_cost"]},
+{id:"jishin_risk",lv:3,dom:"housing",label:"災害リスクと立地選び",desc:"ハザードマップ・地盤・水害履歴。保険料にも資産価値にも直結し、「立地選び自体が最大の保険」という考え方。",links:["kasai","loan"]},
+{id:"shogakukin",lv:3,dom:"edu",label:"奨学金・教育ローン",desc:"給付型/貸与型（無利子・有利子）の別と、親の所得基準。子の返還負担は子のライフプランの初期債務になるため世代をまたぐ設計問題。",links:["kyoiku_hi","jido"]},
+{id:"kyoiku_ikkatsu",lv:3,dom:"edu",label:"教育資金一括贈与など",desc:"祖父母からの教育資金非課税制度。三世代での資金移転はインフレ下の相続対策と教育費問題を同時に解く手段になる。",links:["souzokuzei","kyoiku_hi"]},
+{id:"torikuzushi",lv:3,dom:"old",label:"取り崩し戦略（定率/定額）",desc:"貯める技術と使う技術は別物。定額は暴落に弱く、定率は生活が不安定になる。資産寿命を決める老後設計の本丸。",links:["rougo","rule4","sequence","guardrail","kurisage","kingaku6","montecarlo"]},
+{id:"rule4",lv:3,dom:"old",label:"4%ルール",desc:"米国の研究（トリニティスタディ）由来の「年4%取り崩せば30年持つ」経験則。日本のインフレ・税制・年金にそのまま当てはまるかは要検証。",links:["torikuzushi","jisshitsu","sequence"]},
+{id:"kaigo_cost",lv:3,dom:"old",label:"介護費用の実際",desc:"平均月8万×5年程度＋一時費用と言われるが分布の裾が長い。介護保険の自己負担・施設種別の費用差・親の介護と自分の介護の二段構え。",links:["rougo","kaigo_hoken","ninchi_toketsu","reverse","markov"]},
+{id:"kaigo_hoken",lv:3,dom:"social",label:"公的介護保険",desc:"40歳から保険料負担、65歳から（特定疾病は40歳から）給付。要介護度で支給限度額が決まる。民間介護保険の要否判断の前提。",links:["kaigo_cost","shaho"]},
+{id:"shunyuhosho",lv:3,dom:"ins",label:"収入保障・就業不能保険",desc:"死亡より確率が高い「働けない」リスクへの備え。傷病手当金・障害年金でカバーされない部分（特に自営業）を埋める設計が正しい順序。",links:["shobyo","shogai_nenkin","hitsuyohosho","hoken_seimei"]},
+{id:"hoken_hikazei",lv:3,dom:"ins",label:"生命保険の相続非課税枠",desc:"500万×法定相続人が相続税非課税。保険は「保障」だけでなく「相続の受取人指定・納税資金・非課税枠」という資産承継ツールにもなる。",links:["hoken_seimei","souzokuzei","yuigon"]},
+{id:"yuigon",lv:3,dom:"law",label:"遺言・遺産分割",desc:"遺言の有無で相続の揉め度が激変する。不動産が主な資産だと分割できず紛争化しやすい。付言事項・遺留分への配慮が実務の勘所。",links:["souzokuzei","hoken_hikazei","kouken","shintaku","digital"]},
+{id:"kouken",lv:3,dom:"law",label:"成年後見・任意後見",desc:"判断能力が落ちた後の財産管理の枠組み。法定後見は自由度が低く費用が続くため、元気なうちの任意後見・家族信託の検討が実務の流れ。",links:["ninchi_toketsu","shintaku","yuigon"]},
+// ===== L4 専門家 =====
+{id:"behavior",lv:4,dom:"mind",label:"行動経済学",desc:"プロスペクト理論（損失回避）・現在バイアス・メンタルアカウンティング。人は合理的に貯められない前提で、先取り貯蓄・自動化などの仕組み（ナッジ）で守る。",links:["risktol","saving","discount","happiness"]},
+{id:"humancapital",lv:4,dom:"theory",label:"人的資本理論",desc:"若い人の最大の資産は「将来稼ぐ力」。人的資本が債券的な人（公務員等）は金融資産で株式を厚く、株式的な人（歩合・起業家）は逆に、という配分理論。",links:["income","assetalloc","risktol","merton"]},
+{id:"sequence",lv:4,dom:"old",label:"リターン順序リスク",desc:"同じ平均利回りでも、退職直後に暴落が来るかどうかで資産寿命が激変する。積立期には無害、取り崩し期に牙をむく、老後設計最大の隠れリスク。",links:["torikuzushi","rule4","montecarlo","assetalloc","guardrail"]},
+{id:"guardrail",lv:4,dom:"old",label:"動的取り崩し（ガードレール法）",desc:"資産残高に応じて取り崩し額を増減させる手法。固定4%より資金枯渇確率を大きく下げられる。リターン順序リスクへの実務的な解。",links:["torikuzushi","sequence","montecarlo"]},
+{id:"ninchi_toketsu",lv:4,dom:"old",label:"認知症と資産凍結",desc:"認知症で本人口座は事実上凍結され、家族でも動かせない。日本の家計金融資産の相当割合が凍結リスク下にあり、信託・後見・代理人設定の事前対策が必須。",links:["kouken","shintaku","kaigo_cost","cognition","gerontology"]},
+{id:"macroslide",lv:4,dom:"social",label:"マクロ経済スライド",desc:"年金額の伸びを自動的に抑える調整メカニズム。「年金は破綻しないが実質価値は目減りする」の正体。将来の所得代替率予測の鍵。",links:["nenkin","daigae","inflation","jizoku"]},
+{id:"daigae",lv:4,dom:"social",label:"所得代替率",desc:"現役世代の手取りに対する年金額の割合。財政検証で将来50%程度へ低下見込み。自助努力の必要量を逆算する基準値。",links:["macroslide","nenkin","sedai","rougo"]},
+{id:"nini",lv:4,dom:"social",label:"退職後の健保選択（任意継続vs国保）",desc:"退職1年目の健康保険は任意継続・国保・家族の扶養の3択で保険料が大差。退職前年の所得で決まるため、退職タイミングと一体で設計する。",links:["shaho","taishoku","hyojun"]},
+{id:"hyojun",lv:4,dom:"social",label:"標準報酬月額の仕組み",desc:"社会保険料と将来の年金額・傷病手当を決める基準。4-6月の残業で保険料が変わる等の実務知識。報酬設計（役員報酬など）の最適化にも繋がる。",links:["shaho","kabe","nini","shobyo"]},
+{id:"rule5_19",lv:4,dom:"tax",label:"退職金の5年/19年ルール",desc:"iDeCo一時金と退職金の受取間隔で退職所得控除の重複調整が変わるルール。受取順序を誤ると数十万〜百万円単位で税額が変わる、出口設計の最深部。",links:["taishoku_kojo","dc_uketori","ideco"]},
+{id:"dc_uketori",lv:4,dom:"tax",label:"DC・iDeCo受取の最適化",desc:"一時金（退職所得控除）か年金（公的年金等控除＋社保増）かの選択問題。退職金・公的年金・住民税・国保料まで含めた総合最適が必要。",links:["taishoku_kojo","rule5_19","ideco","dc","taishoku","kurisage"]},
+{id:"rikon",lv:4,dom:"law",label:"離婚の年金分割・財産分与",desc:"婚姻期間の厚生年金記録を分割（合意分割/3号分割）。財産分与の税務、ペアローンの処理、ひとり親支援制度まで、離婚はライフプランの全面改定イベント。",links:["nenkin","pairloan","kabe"]},
+{id:"shintaku",lv:4,dom:"law",label:"家族信託・受益者連続型",desc:"認知症対策と数世代先までの資産承継指定を両立できる仕組み。後見より柔軟だが設計・維持コストと担い手（受託者）の確保が課題。",links:["ninchi_toketsu","kouken","souzokuzei","yuigon"]},
+{id:"kenkoujumyo",lv:4,dom:"health",label:"健康寿命×資産寿命",desc:"平均寿命と健康寿命の差は約10年＝医療介護費がかさみ活動費が減る期間。「元気なうちに使う」「後半に備える」の配分問題で、旅行等の前倒し消費の根拠になる。",links:["rougo","kurisage","kaigo_cost","happiness","socialcap"]},
+{id:"senshiniryo",lv:4,dom:"health",label:"先進医療・自由診療の実態",desc:"先進医療は該当件数が少なく特約は安価。一方、自由診療（がん治療等）は青天井。医療保障設計は「起こる確率×金額」で冷静に見る。",links:["hoken_iryo","kougaku"]},
+{id:"gerontology",lv:4,dom:"theory",label:"金融ジェロントロジー",desc:"高齢期の認知機能低下と金融行動を研究する学際分野。資産管理の簡素化・自動化・見守り体制など「衰える前提の設計」を提供する。",links:["ninchi_toketsu","cognition","torikuzushi"]},
+{id:"jizoku",lv:4,dom:"econ",label:"社会保障の持続可能性",desc:"少子高齢化での医療・介護・年金の給付と負担の構造。将来の保険料率・給付水準・増税の前提を置くとき、悲観しすぎず制度改正の方向を読む視点。",links:["macroslide","sedai","shaho","kaigo_hoken"]},
+{id:"kinyu_seisaku",lv:4,dom:"econ",label:"金融政策と金利",desc:"日銀の政策金利は住宅ローン変動金利・預金金利・債券価格・為替に波及。変動/固定の選択やアセットアロケーションの背景となるマクロ変数。",links:["kinri","inflation","assetalloc"]},
+// ===== L5 超マニア・周辺学問 =====
+{id:"merton",lv:5,dom:"theory",label:"マートンの最適消費・投資問題",desc:"生涯の消費と投資配分を数学的に最適化する連続時間ファイナンスの金字塔。人的資本を含めた理論的な最適株式比率の源流で、ターゲットデートファンドの理論的背景。",links:["humancapital","lifecycle_opt","assetalloc"]},
+{id:"lifecycle_opt",lv:5,dom:"theory",label:"ライフサイクル最適化（動的計画法）",desc:"毎年の消費・貯蓄・保険・年金請求を状態変数（資産・健康・就労）に応じて最適化する研究領域。FPの実務判断の多くはこの近似解と見なせる。",links:["merton","montecarlo","torikuzushi","markov"]},
+{id:"leecarter",lv:5,dom:"theory",label:"リー・カーターモデル（死亡率予測）",desc:"将来の死亡率改善を統計的に予測するモデル。年金財政・保険料率・個人の「何歳まで生きる前提を置くか」の科学的根拠。",links:["tontine","sedai","kenkoujumyo"]},
+{id:"markov",lv:5,dom:"theory",label:"健康状態のマルコフ遷移モデル",desc:"健康→要支援→要介護→死亡の遷移確率で介護費用の分布を推定する手法。「平均5年」ではなく「10年超の確率」で備えを設計できる。",links:["kaigo_cost","lifecycle_opt","kenkoujumyo"]},
+{id:"tontine",lv:5,dom:"theory",label:"トンチン年金・長寿リスクヘッジ",desc:"長生きした人ほど多く受け取る仕組みで長寿リスクを参加者間でシェアする。公的年金繰下げは実質最強のトンチンという見方もできる。",links:["kurisage","annuity","leecarter"]},
+{id:"annuity",lv:5,dom:"theory",label:"アニュイティ・パズル",desc:"理論上は終身年金を買うのが合理的なのに、実際は誰も買わない謎。遺産動機・流動性・保険会社不信・行動バイアスで説明される。取り崩し設計の理論的背景。",links:["tontine","behavior","torikuzushi"]},
+{id:"sedai",lv:5,dom:"econ",label:"世代会計・財政検証の読み方",desc:"世代ごとの受益と負担の収支計算、年金財政検証のオプション試算の読み解き。「自分の世代の年金前提」を自分で置けるようになる最深部。",links:["daigae","jizoku","macroslide","leecarter"]},
+{id:"happiness",lv:5,dom:"mind",label:"幸福の経済学",desc:"収入と幸福度の関係（一定水準で飽和するか等）、経験消費vs物質消費の研究。「いくらあれば足りるか」というライフプランの目的関数そのものを扱う。",links:["behavior","kenkoujumyo","socialcap","expense"]},
+{id:"discount",lv:5,dom:"mind",label:"時間割引率の個人差",desc:"将来の価値をどれだけ割り引くかの個人差測定。貯蓄率・借金癖・健康行動まで予測する変数で、「貯められない」の科学的正体。",links:["behavior","saving"]},
+{id:"cognition",lv:5,dom:"health",label:"加齢と金融判断力の研究",desc:"金融ミスは53歳前後で最少、以後増えるという実証研究（Agarwalら）。何歳までに資産運用を簡素化・自動化すべきかの科学的根拠。",links:["gerontology","ninchi_toketsu"]},
+{id:"socialcap",lv:5,dom:"health",label:"社会関係資本と孤立リスク",desc:"人間関係の豊かさが健康寿命・幸福度・介護リスクを左右するという研究。お金だけ貯めても孤立すると老後の質が下がる、非金融のライフプラン要素。",links:["kenkoujumyo","happiness","teleology"]},
+{id:"teleology",lv:5,dom:"health",label:"死生学・エンドオブライフ",desc:"人生会議（ACP）・尊厳死・看取りの場所・葬儀と墓の費用。最期の医療の意思決定は本人・家族の負担と費用を大きく変える、ライフプランの終章。",links:["socialcap","yuigon","digital"]},
+{id:"digital",lv:5,dom:"law",label:"デジタル遺産・暗号資産の相続",desc:"ネット証券・暗号資産・サブスク・SNSアカウントの死後処理。パスワードが分からないと資産が消える時代の新しい終活実務。",links:["yuigon","souzokuzei","teleology"]},
+{id:"expat",lv:5,dom:"tax",label:"国際移住の税務・外国年金",desc:"出国税（含み益課税）・居住者判定・社会保障協定・外国年金の取り扱い。海外移住やリタイア先選びを考えるなら避けて通れない領域。",links:["souzokuzei","nenkin","shotokuzei"]},
+];
+
+// ---- レイアウト ----
+const byDom = {};
+NODES.forEach(n=>{ (byDom[n.dom]=byDom[n.dom]||[]).push(n); });
+Object.entries(byDom).forEach(([dom,list])=>{
+  const c = DOMAINS[dom];
+  list.forEach((n,i)=>{
+    if(list.length===1){ n.x=c.x; n.y=c.y; return; }
+    const ring = i<7 ? 0 : 1;
+    const idxInRing = ring===0 ? i : i-7;
+    const countInRing = ring===0 ? Math.min(list.length,7) : list.length-7;
+    const r = ring===0 ? (list.length<=3?70:110) : 200;
+    const a = (idxInRing/countInRing)*Math.PI*2 + (ring*0.4) - Math.PI/2;
+    n.x = c.x + r*Math.cos(a);
+    n.y = c.y + r*Math.sin(a) + 30;
+  });
+});
+
+// エッジ（重複除去・無向）
+const nodeById = Object.fromEntries(NODES.map(n=>[n.id,n]));
+const edgeSet = new Set(); const EDGES=[];
+NODES.forEach(n=>{ (n.links||[]).forEach(t=>{
+  if(!nodeById[t]){ return; }
+  const key = n.id<t? n.id+"|"+t : t+"|"+n.id;
+  if(!edgeSet.has(key)){ edgeSet.add(key); EDGES.push([n.id,t]); }
+});});
+
+// 隣接
+const adj={}; NODES.forEach(n=>adj[n.id]=new Set());
+EDGES.forEach(([a,b])=>{ adj[a].add(b); adj[b].add(a); });
+
+// ---- 描画 ----
+const svg=document.getElementById("svg"), view=document.getElementById("view");
+const NS="http://www.w3.org/2000/svg";
+function el(t,attrs){ const e=document.createElementNS(NS,t); for(const k in attrs)e.setAttribute(k,attrs[k]); return e; }
+
+// クラスタラベル
+Object.entries(DOMAINS).forEach(([k,d])=>{
+  const t=el("text",{x:d.x,y:d.y-240,"text-anchor":"middle",class:"cluster-label"});
+  t.textContent=d.name; view.appendChild(t);
+});
+// エッジ
+const edgeEls={};
+EDGES.forEach(([a,b])=>{
+  const n1=nodeById[a],n2=nodeById[b];
+  const mx=(n1.x+n2.x)/2, my=(n1.y+n2.y)/2 - Math.min(120, Math.hypot(n2.x-n1.x,n2.y-n1.y)*0.12);
+  const p=el("path",{d:`M${n1.x},${n1.y} Q${mx},${my} ${n2.x},${n2.y}`,class:"edge","stroke-width":1.6});
+  view.appendChild(p); edgeEls[a+"|"+b]=p;
+});
+// ノード
+const nodeEls={};
+NODES.forEach(n=>{
+  const g=el("g",{class:"node"});
+  const r = 16 + (5-n.lv)*2.5; // 基本ほど大きい
+  g.appendChild(el("circle",{cx:n.x,cy:n.y,r:r,fill:LVCOLOR[n.lv]}));
+  const t=el("text",{x:n.x,y:n.y+r+18,"text-anchor":"middle"});
+  t.textContent=n.label; g.appendChild(t);
+  g.addEventListener("click",ev=>{ev.stopPropagation();select(n.id);});
+  view.appendChild(g); nodeEls[n.id]=g;
+});
+
+// ---- 選択・ハイライト ----
+let selected=null, maxLv=5;
+const panel=document.getElementById("panel");
+function visible(n){ return n.lv<=maxLv; }
+function refresh(){
+  NODES.forEach(n=>{
+    const g=nodeEls[n.id];
+    const vis=visible(n);
+    g.style.display=vis?"":"none";
+    g.classList.toggle("sel",selected===n.id);
+    if(selected){ g.classList.toggle("dim", n.id!==selected && !adj[selected].has(n.id)); }
+    else g.classList.remove("dim");
+  });
+  EDGES.forEach(([a,b])=>{
+    const p=edgeEls[a+"|"+b];
+    const vis=visible(nodeById[a])&&visible(nodeById[b]);
+    p.style.display=vis?"":"none";
+    p.classList.remove("hl","dim");
+    if(selected){ (a===selected||b===selected)? p.classList.add("hl") : p.classList.add("dim"); }
+  });
+}
+function select(id){
+  selected=id; refresh();
+  const n=nodeById[id];
+  const neighbors=[...adj[id]].map(t=>nodeById[t]).filter(visible).sort((x,y)=>x.lv-y.lv);
+  panel.innerHTML = `
+    <h2>${n.label}</h2>
+    <div class="meta">
+      <span class="badge" style="background:${LVCOLOR[n.lv]}">マニアック度 L${n.lv}</span>
+      <span class="badge" style="background:#3a4556">${DOMAINS[n.dom].name}</span>
+    </div>
+    <p>${n.desc}</p>
+    <h3>🔗 影響しあう要素（${neighbors.length}）</h3>
+    <div>${neighbors.map(m=>`<span class="chip" data-id="${m.id}" style="border-color:${LVCOLOR[m.lv]}">${m.label} <small>L${m.lv}</small></span>`).join("")}</div>`;
+  panel.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>select(c.dataset.id)));
+}
+svg.addEventListener("click",()=>{ selected=null; refresh(); });
+
+// ---- レベルフィルタ ----
+const lvbtns=document.getElementById("lvbtns");
+[["1","基本のみ"],["2","〜FP2級"],["3","〜実務"],["4","〜専門家"],["5","全部見せて"]].forEach(([lv,name])=>{
+  const b=document.createElement("button");
+  b.className="lvbtn"+(lv==="5"?" active":""); b.textContent=`L${lv} ${name}`;
+  b.addEventListener("click",()=>{
+    maxLv=+lv;
+    lvbtns.querySelectorAll(".lvbtn").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    if(selected && !visible(nodeById[selected])) selected=null;
+    refresh();
+  });
+  lvbtns.appendChild(b);
+});
+
+// ---- 検索 ----
+document.getElementById("search").addEventListener("input",e=>{
+  const q=e.target.value.trim();
+  if(!q){ refresh(); return; }
+  const hit=NODES.find(n=>visible(n)&&(n.label.includes(q)||n.desc.includes(q)));
+  if(hit){ select(hit.id); centerOn(hit); }
+});
+
+// ---- パン・ズーム ----
+let vb={x:0,y:0,w:2900,h:1900};
+function applyVB(){ svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`); }
+function fit(){ vb={x:0,y:-60,w:2900,h:1900}; applyVB(); }
+function centerOn(n){ vb={x:n.x-vb.w/4, y:n.y-vb.h/4, w:vb.w/1.0, h:vb.h/1.0}; applyVB(); }
+fit();
+let drag=null;
+svg.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y}; document.getElementById("map").classList.add("dragging"); });
+window.addEventListener("pointermove",e=>{ if(!drag)return; const s=vb.w/svg.clientWidth;
+  vb.x=drag.vx-(e.clientX-drag.x)*s; vb.y=drag.vy-(e.clientY-drag.y)*s; applyVB(); });
+window.addEventListener("pointerup",()=>{ drag=null; document.getElementById("map").classList.remove("dragging"); });
+svg.addEventListener("wheel",e=>{ e.preventDefault();
+  const f=e.deltaY>0?1.12:0.89;
+  const rect=svg.getBoundingClientRect();
+  const px=vb.x+(e.clientX-rect.left)/rect.width*vb.w;
+  const py=vb.y+(e.clientY-rect.top)/rect.height*vb.h;
+  vb.w*=f; vb.h*=f; vb.x=px-(px-vb.x)*f; vb.y=py-(py-vb.y)*f; applyVB();
+},{passive:false});
+document.getElementById("zin").onclick=()=>{ vb.w/=1.3;vb.h/=1.3;vb.x+=vb.w*.15;vb.y+=vb.h*.15;applyVB(); };
+document.getElementById("zout").onclick=()=>{ vb.x-=vb.w*.15;vb.y-=vb.h*.15;vb.w*=1.3;vb.h*=1.3;applyVB(); };
+document.getElementById("zfit").onclick=fit;
+
+refresh();
+</script>
+</body>
+</html>

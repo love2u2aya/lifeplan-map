@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ライフプランニング宇宙 — 3D相互影響マップ</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; overflow:hidden; background:#04060f; font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; color:#e8eaed; }
+  #graph { position:absolute; inset:0; }
+  .glass { background:rgba(10,15,28,.72); border:1px solid rgba(120,150,210,.22); border-radius:14px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 8px 32px rgba(0,0,0,.45); }
+  #toolbar { position:absolute; top:14px; left:14px; z-index:10; padding:12px 14px; max-width:540px; }
+  #toolbar h1 { font-size:14px; margin-bottom:10px; background:linear-gradient(90deg,#ffd479,#ff9d6c); -webkit-background-clip:text; background-clip:text; color:transparent; letter-spacing:.5px; }
+  .lvbtns { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .lvbtn { border:1px solid rgba(120,150,210,.3); background:rgba(30,40,66,.6); color:#cfd6df; border-radius:20px; padding:5px 12px; font-size:12px; cursor:pointer; transition:all .2s; }
+  .lvbtn:hover { border-color:#ffd479; }
+  .lvbtn.active { background:linear-gradient(135deg,#3d5a80,#5a4a8a); border-color:#8fb8e8; color:#fff; box-shadow:0 0 12px rgba(110,168,216,.5); }
+  #search { width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(120,150,210,.3); background:rgba(20,28,46,.7); color:#e8eaed; font-size:13px; outline:none; }
+  #search:focus { border-color:#ffd479; box-shadow:0 0 10px rgba(255,212,121,.25); }
+  .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:9px; font-size:11px; color:#aab3bf; }
+  .legend span { display:inline-flex; align-items:center; gap:4px; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; box-shadow:0 0 8px currentColor; }
+  #panel { position:absolute; top:14px; right:14px; bottom:14px; width:330px; z-index:10; padding:16px; overflow-y:auto; }
+  #panel::-webkit-scrollbar { width:6px; } #panel::-webkit-scrollbar-thumb { background:rgba(120,150,210,.3); border-radius:3px; }
+  #panel h2 { font-size:17px; color:#ffd479; margin-bottom:6px; text-shadow:0 0 16px rgba(255,212,121,.4); }
+  #panel .meta { font-size:12px; color:#9aa5b1; margin-bottom:10px; }
+  #panel .badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; color:#fff; margin-right:6px; }
+  #panel p { font-size:13px; line-height:1.75; margin-bottom:14px; }
+  #panel h3 { font-size:12px; color:#8fa0b5; margin-bottom:8px; letter-spacing:1px; }
+  .chip { display:inline-block; margin:0 6px 7px 0; padding:4px 11px; background:rgba(36,48,74,.8); border:1px solid #3a4a5f; border-radius:14px; font-size:12px; cursor:pointer; color:#cfe0f0; transition:all .15s; }
+  .chip:hover { background:rgba(70,90,130,.9); box-shadow:0 0 10px rgba(140,180,255,.3); transform:translateY(-1px); }
+  .hint { color:#8a96a6; font-size:12px; line-height:1.9; }
+  #loading { position:absolute; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#04060f; transition:opacity .8s; }
+  #loading .orb { width:56px; height:56px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #ffd479, #b0682a 60%, transparent); box-shadow:0 0 44px #ffd479aa; animation:pulse 1.4s ease-in-out infinite; margin-bottom:22px; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.18);opacity:1} }
+  #loading div.txt { color:#aab8cf; font-size:13px; letter-spacing:2px; }
+  #fallback { display:none; position:absolute; inset:0; z-index:60; background:#0a0f1c; padding:60px 30px; text-align:center; font-size:14px; line-height:2; }
+  #fallback a { color:#ffd479; }
+  .foot { position:absolute; bottom:12px; left:14px; z-index:10; font-size:11px; color:#5f6c80; }
+  .foot a { color:#8fa8cf; text-decoration:none; }
+  @media (max-width:900px){ #panel{ width:min(86vw,330px); top:auto; max-height:44vh; } #toolbar{ max-width:78vw; } }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+
+<div id="toolbar" class="glass">
+  <h1>🌌 ライフプランニング宇宙 — クリックした要素の影響が光ります</h1>
+  <div class="lvbtns" id="lvbtns"></div>
+  <input id="search" type="text" placeholder="🔍 検索してその星へ飛ぶ（例: 年金 / NISA / 相続）">
+  <div class="legend">
+    <span style="color:#3dffa0"><i class="dot" style="background:#3dffa0"></i></span><span>L1 基本</span>
+    <span style="color:#4dc3ff"><i class="dot" style="background:#4dc3ff"></i></span><span>L2 FP級</span>
+    <span style="color:#b07bff"><i class="dot" style="background:#b07bff"></i></span><span>L3 実務</span>
+    <span style="color:#ffab4d"><i class="dot" style="background:#ffab4d"></i></span><span>L4 専門家</span>
+    <span style="color:#ff5c8a"><i class="dot" style="background:#ff5c8a"></i></span><span>L5 超マニア</span>
+  </div>
+</div>
+
+<div id="panel" class="glass">
+  <h2>操作ガイド</h2>
+  <p class="hint">
+    ⭐ <b>星をクリック</b> → カメラが飛び、影響しあう要素だけが金色に光ります。<br>
+    🖱 ドラッグで回転、ホイールで拡大縮小。放っておくとゆっくり自転します。<br>
+    🎚 左上のボタンでマニアック度を絞り込み（L1→L5で知識の地層が増える）。<br>
+    ✨ リンク上を流れる光の粒は「影響の流れ」。<br><br>
+    大きい星ほど基本、色が赤紫に寄るほどマニアック。星の集まり（星座）が分野です。
+  </p>
+</div>
+
+<div class="foot">95要素 × 217リンク ｜ <a href="map2d.html">🗺 2D俯瞰版はこちら</a></div>
+
+<div id="loading"><div class="orb"></div><div class="txt">ライフプラン宇宙を生成中…</div></div>
+<div id="fallback" class="glass">
+  ⚠️ 3D表示ライブラリの読み込みに失敗しました（オフライン等）。<br>
+  <a href="map2d.html">2D版マップ</a> をご利用ください。
+</div>
+
+<script src="data.js"></script>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+const LV = {
+  1:{c:"#3dffa0"}, 2:{c:"#4dc3ff"}, 3:{c:"#b07bff"}, 4:{c:"#ffab4d"}, 5:{c:"#ff5c8a"}
+};
+const GOLD = "#ffd479";
+
+async function boot(){
+  const [{default:ForceGraph3D},{default:SpriteText},{UnrealBloomPass},THREE] = await Promise.all([
+    import("https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.mjs"),
+    import("https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.mjs"),
+    import("three/addons/postprocessing/UnrealBloomPass.js"),
+    import("three"),
+  ]);
+
+  const {DOMAINS, NODES} = window.LP;
+
+  // ---- グラフデータ構築 ----
+  const nodes = NODES.map(n=>({...n}));
+  const byId = Object.fromEntries(nodes.map(n=>[n.id,n]));
+  const seen = new Set(); const links = [];
+  nodes.forEach(n=>(n.links||[]).forEach(t=>{
+    if(!byId[t]) return;
+    const k = n.id<t? n.id+"|"+t : t+"|"+n.id;
+    if(!seen.has(k)){ seen.add(k); links.push({source:n.id, target:t}); }
+  }));
+  const deg = {}; links.forEach(l=>{ deg[l.source]=(deg[l.source]||0)+1; deg[l.target]=(deg[l.target]||0)+1; });
+
+  // 分野クラスタのアンカー座標（2Dレイアウトを3D空間へ写像）
+  const CX=1450, CY=960, S=0.62;
+  nodes.forEach(n=>{
+    const d = DOMAINS[n.dom];
+    n.ax=(d.x-CX)*S; n.ay=-(d.y-CY)*S;
+    n.x=n.ax+(Math.random()-0.5)*60; n.y=n.ay+(Math.random()-0.5)*60; n.z=(Math.random()-0.5)*120;
+  });
+
+  // ---- 状態 ----
+  let selected=null, maxLv=5;
+  const hlN=new Set(); const hlL=new Set();
+
+  const elGraph = document.getElementById("graph");
+  const Graph = ForceGraph3D({controlType:"orbit"})(elGraph)
+    .backgroundColor("#04060f")
+    .graphData({nodes, links})
+    .nodeThreeObject(n=>{
+      const r = 3.4 + (5-n.lv)*1.05 + Math.min(deg[n.id]||1,12)*0.30;
+      n.__r=r;
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(r,24,24),
+        new THREE.MeshLambertMaterial({color:LV[n.lv].c, emissive:LV[n.lv].c, emissiveIntensity:0.55, transparent:true, opacity:0.95})
+      );
+      const label = new SpriteText(n.label, 4.4, "#9fb2ca");
+      label.fontFace = "Hiragino Sans, sans-serif";
+      label.material.depthWrite=false;
+      label.material.transparent=true;
+      label.position.y = -(r+6);
+      mesh.add(label);
+      n.__mat=mesh.material; n.__label=label; n.__mesh=mesh;
+      return mesh;
+    })
+    .nodeVisibility(n=>n.lv<=maxLv)
+    .linkVisibility(l=>l.source.lv<=maxLv && l.target.lv<=maxLv)
+    .linkColor(l=> hlL.has(l) ? GOLD : (selected? "rgba(30,42,70,0.9)" : "rgba(90,115,165,0.75)"))
+    .linkOpacity(0.35)
+    .linkWidth(l=> hlL.has(l)? 1.6 : 0.35)
+    .linkDirectionalParticles(l=> hlL.has(l)? 4 : 1)
+    .linkDirectionalParticleSpeed(l=> hlL.has(l)? 0.011 : 0.0032)
+    .linkDirectionalParticleWidth(l=> hlL.has(l)? 2.4 : 1.1)
+    .linkDirectionalParticleColor(l=> hlL.has(l)? "#ffe9a8" : "#6f8fd0")
+    .onNodeClick(n=>{ select(n); flyTo(n); })
+    .onNodeHover(n=> elGraph.style.cursor = n? "pointer":"default")
+    .onBackgroundClick(()=> select(null));
+
+  // 力学：分野クラスタへ緩く引き寄せる
+  const clusterForce = alpha=>{ nodes.forEach(n=>{
+    n.vx += (n.ax-n.x)*0.055*alpha; n.vy += (n.ay-n.y)*0.055*alpha; n.vz += (0-n.z)*0.018*alpha;
+  });};
+  clusterForce.initialize=()=>{};
+  Graph.d3Force("cluster", clusterForce);
+  Graph.d3Force("charge").strength(-150);
+  Graph.d3Force("link").distance(55);
+
+  // ---- 発光（ブルーム） ----
+  const bloom = new UnrealBloomPass();
+  bloom.strength=1.35; bloom.radius=0.55; bloom.threshold=0.22;
+  Graph.postProcessingComposer().addPass(bloom);
+
+  // ---- 星空と分野ラベル ----
+  const scene = Graph.scene();
+  {
+    const g=new THREE.BufferGeometry(); const pos=[];
+    for(let i=0;i<1600;i++){ const R=900+Math.random()*1400, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+      pos.push(R*Math.sin(ph)*Math.cos(th), R*Math.sin(ph)*Math.sin(th), R*Math.cos(ph)); }
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({color:"#7f93bd", size:1.3, transparent:true, opacity:0.65, depthWrite:false})));
+  }
+  Object.values(DOMAINS).forEach(d=>{
+    const t=new SpriteText(d.name, 13, "rgba(105,130,175,0.5)");
+    t.fontFace="Hiragino Sans, sans-serif"; t.material.depthWrite=false;
+    t.position.set((d.x-CX)*S, -(d.y-CY)*S + 150, -40);
+    scene.add(t);
+  });
+
+  // ---- 選択・ハイライト ----
+  function restyle(){
+    nodes.forEach(n=>{
+      const on = !selected || hlN.has(n.id);
+      if(n.__mat){ n.__mat.opacity = on?0.95:0.10;
+        n.__mat.emissiveIntensity = (selected && n.id===selected.id)? 1.4 : (on?0.55:0.10); }
+      if(n.__label) n.__label.material.opacity = on?1:0.05;
+      if(n.__mesh){ const s=(selected&&n.id===selected.id)?1.35:1; n.__mesh.scale.set(s,s,s); }
+    });
+    Graph.linkColor(Graph.linkColor());
+    Graph.linkWidth(Graph.linkWidth());
+    Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
+  }
+  const panel=document.getElementById("panel");
+  function select(n){
+    selected=n; hlN.clear(); hlL.clear();
+    if(n){
+      hlN.add(n.id);
+      links.forEach(l=>{
+        const a=l.source.id||l.source, b=l.target.id||l.target;
+        if(a===n.id||b===n.id){ hlL.add(l); hlN.add(a===n.id?b:a); }
+      });
+      const neighbors=[...hlN].filter(id=>id!==n.id).map(id=>byId[id]).filter(m=>m.lv<=maxLv).sort((x,y)=>x.lv-y.lv);
+      panel.innerHTML = `
+        <h2>${n.label}</h2>
+        <div class="meta">
+          <span class="badge" style="background:${LV[n.lv].c};color:#0a0f1c">マニアック度 L${n.lv}</span>
+          <span class="badge" style="background:rgba(70,85,115,.8)">${DOMAINS[n.dom].name}</span>
+        </div>
+        <p>${n.desc}</p>
+        <h3>🔗 影響しあう要素（${neighbors.length}）</h3>
+        <div>${neighbors.map(m=>`<span class="chip" data-id="${m.id}" style="border-color:${LV[m.lv].c}">${m.label} <small style="color:${LV[m.lv].c}">L${m.lv}</small></span>`).join("")}</div>`;
+      panel.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{ const m=byId[c.dataset.id]; select(m); flyTo(m); }));
+    } else {
+      panel.innerHTML = `<h2>操作ガイド</h2><p class="hint">⭐ <b>星をクリック</b> → カメラが飛び、影響しあう要素だけが金色に光ります。<br>🖱 ドラッグで回転、ホイールで拡大縮小。放っておくとゆっくり自転します。<br>🎚 左上のボタンでマニアック度を絞り込み。<br>✨ 光の粒は「影響の流れ」。</p>`;
+    }
+    restyle();
+  }
+  function flyTo(n){
+    const dist=140; const dr=1+dist/Math.hypot(n.x||1,n.y||1,n.z||1);
+    Graph.cameraPosition({x:n.x*dr, y:n.y*dr, z:n.z*dr}, n, 1300);
+  }
+
+  // ---- レベルフィルタ ----
+  const lvbtns=document.getElementById("lvbtns");
+  [["1","基本のみ"],["2","〜FP級"],["3","〜実務"],["4","〜専門家"],["5","全宇宙"]].forEach(([lv,name])=>{
+    const b=document.createElement("button");
+    b.className="lvbtn"+(lv==="5"?" active":""); b.textContent=`L${lv} ${name}`;
+    b.addEventListener("click",()=>{
+      maxLv=+lv;
+      lvbtns.querySelectorAll(".lvbtn").forEach(x=>x.classList.remove("active"));
+      b.classList.add("active");
+      if(selected && selected.lv>maxLv) selected=null;
+      Graph.nodeVisibility(Graph.nodeVisibility());
+      Graph.linkVisibility(Graph.linkVisibility());
+      select(selected);
+    });
+    lvbtns.appendChild(b);
+  });
+
+  // ---- 検索 ----
+  document.getElementById("search").addEventListener("input",e=>{
+    const q=e.target.value.trim(); if(!q) return;
+    const hit=nodes.find(n=>n.lv<=maxLv && (n.label.includes(q)||n.desc.includes(q)));
+    if(hit){ select(hit); flyTo(hit); }
+  });
+
+  // ---- 自動回転（触ると止まり、18秒放置で再開） ----
+  const controls=Graph.controls();
+  controls.autoRotate=true; controls.autoRotateSpeed=0.55;
+  let idleT;
+  const wake=()=>{ controls.autoRotate=false; clearTimeout(idleT); idleT=setTimeout(()=>controls.autoRotate=true,18000); };
+  elGraph.addEventListener("pointerdown",wake);
+  elGraph.addEventListener("wheel",wake,{passive:true});
+
+  // ---- イントロ：遠景からズームイン ----
+  Graph.cameraPosition({x:0,y:60,z:1500});
+  setTimeout(()=>Graph.cameraPosition({x:0,y:50,z:560},undefined,2800), 500);
+
+  window.addEventListener("resize",()=>{ Graph.width(innerWidth); Graph.height(innerHeight); });
+
+  const ld=document.getElementById("loading");
+  ld.style.opacity=0; setTimeout(()=>ld.remove(),850);
+}
+
+boot().catch(err=>{
+  console.error(err);
+  document.getElementById("loading").remove();
+  document.getElementById("fallback").style.display="block";
+});
+</script>
+</body>
+</html>
