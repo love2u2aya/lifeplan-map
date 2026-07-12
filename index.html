@@ -3,13 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ライフプランニング宇宙 — 3D相互影響マップ</title>
+<title>加藤OS — ライフプランニング宇宙</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { height:100%; overflow:hidden; background:#04060f; font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; color:#e8eaed; }
   #graph { position:absolute; inset:0; }
   .glass { background:rgba(10,15,28,.78); border:1px solid rgba(120,150,210,.22); border-radius:14px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 8px 32px rgba(0,0,0,.45); }
-  #toolbar { position:absolute; top:14px; left:14px; z-index:10; padding:12px 14px; max-width:540px; }
+  #toolbar { position:absolute; top:14px; left:14px; z-index:10; padding:12px 14px; max-width:540px; transition:transform .7s ease; }
+  body.touring #toolbar { transform:translateX(-130%); }
+  body.touring #panel { transform:translateX(130%); }
+  body.touring .foot { opacity:0; }
+  .foot { transition:opacity .5s; }
   #toolbar h1 { font-size:14px; margin-bottom:10px; background:linear-gradient(90deg,#ffd479,#ff9d6c); -webkit-background-clip:text; background-clip:text; color:transparent; letter-spacing:.5px; }
   .lvbtns { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .lvbtn { border:1px solid rgba(120,150,210,.3); background:rgba(30,40,66,.6); color:#cfd6df; border-radius:20px; padding:5px 12px; font-size:12px; cursor:pointer; transition:all .2s; }
@@ -22,7 +26,7 @@
   .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:9px; font-size:11px; color:#aab3bf; }
   .legend span { display:inline-flex; align-items:center; gap:4px; }
   .dot { width:10px; height:10px; border-radius:50%; display:inline-block; box-shadow:0 0 8px currentColor; }
-  #panel { position:absolute; top:14px; right:14px; bottom:14px; width:330px; z-index:10; padding:16px; overflow-y:auto; }
+  #panel { position:absolute; top:14px; right:14px; bottom:14px; width:330px; z-index:10; padding:16px; overflow-y:auto; transition:transform .7s ease; }
   #panel::-webkit-scrollbar { width:6px; } #panel::-webkit-scrollbar-thumb { background:rgba(120,150,210,.3); border-radius:3px; }
   #panel h2 { font-size:17px; color:#ffd479; margin-bottom:6px; text-shadow:0 0 16px rgba(255,212,121,.4); }
   #panel .meta { font-size:12px; color:#9aa5b1; margin-bottom:10px; }
@@ -60,6 +64,15 @@
   #tip { position:absolute; z-index:30; max-width:310px; padding:10px 13px; font-size:12px; line-height:1.7; pointer-events:none; display:none; }
   #tip b.t { color:#ffd479; font-size:13px; }
   #tip .lv { display:inline-block; padding:1px 7px; border-radius:9px; font-size:10px; color:#0a0f1c; margin-left:6px; font-weight:bold; }
+  /* 加藤OSの決め台詞 */
+  .serifu { margin:10px 0 14px; padding:8px 12px; border-left:3px solid #ffd479; background:rgba(255,212,121,.07); color:#ffe9be; font-size:12.5px; line-height:1.8; border-radius:0 8px 8px 0; }
+  /* ツアー字幕（映画のテロップ風） */
+  #caption { position:absolute; left:50%; bottom:42px; transform:translate(-50%,24px); z-index:20; max-width:640px; width:calc(100% - 40px); padding:14px 20px; text-align:center; opacity:0; pointer-events:none; transition:opacity .9s ease, transform .9s ease; }
+  #caption.show { opacity:1; transform:translate(-50%,0); }
+  #caption b { color:#ffd479; font-size:16px; }
+  #caption .cap-body { margin-top:6px; font-size:13px; color:#d5deea; line-height:1.8; }
+  #stopBtn { display:none; position:absolute; top:14px; right:14px; z-index:21; padding:8px 16px; }
+  body.touring #stopBtn { display:block; }
   @media (max-width:900px){ #panel{ width:min(86vw,330px); top:auto; max-height:46vh; } #toolbar{ max-width:78vw; } }
 </style>
 </head>
@@ -67,7 +80,7 @@
 <div id="graph"></div>
 
 <div id="toolbar" class="glass">
-  <h1>🌌 ライフプランニング宇宙 — クリックした要素の影響が光ります</h1>
+  <h1>🧠 加藤OS — ライフプランニング宇宙（FPあやの頭の中）</h1>
   <div class="lvbtns" id="lvbtns"></div>
   <input id="search" type="text" placeholder="🔍 検索してその星へ飛ぶ（例: 年金 / NISA / 相続）">
   <div class="legend">
@@ -76,16 +89,19 @@
     <span style="color:#b07bff"><i class="dot" style="background:#b07bff"></i></span><span>L3 実務</span>
     <span style="color:#ffab4d"><i class="dot" style="background:#ffab4d"></i></span><span>L4 専門家</span>
     <span style="color:#ff5c8a"><i class="dot" style="background:#ff5c8a"></i></span><span>L5 超マニア</span>
+    <span style="color:#ffd479"><i class="dot" style="background:#ffd479"></i></span><span><b>加藤OS思想</b></span>
   </div>
 </div>
 
 <div id="panel" class="glass"></div>
 
-<div class="foot">95要素 × 217リンク ｜ <a href="map2d.html">🗺 2D俯瞰版</a></div>
+<div class="foot">FP知識95 ＋ 加藤OS思想10 × 259リンク ｜ <a href="map2d.html">🗺 2D俯瞰版</a></div>
 
 <div id="tip" class="glass"></div>
+<div id="caption" class="glass"></div>
+<button id="stopBtn" class="lvbtn diag glass">⏸ ツアー停止</button>
 
-<div id="loading"><div class="orb"></div><div class="txt">ライフプラン宇宙を生成中…</div></div>
+<div id="loading"><div class="orb"></div><div class="txt">加藤OS を起動しています…</div></div>
 <div id="fallback" class="glass">
   ⚠️ 3D表示ライブラリの読み込みに失敗しました（オフライン等）。<br>
   <a href="map2d.html">2D版マップ</a> をご利用ください。
@@ -170,6 +186,7 @@ var maxLv=5;
 var hoverNode=null;       // ホバー中の星
 var mouse={x:0,y:0};
 var tour={on:false, timer:null, visited:{}};
+var trail={on:true, quad:null, mat:null};   // 残像エフェクト状態
 
 // ---- ホバー説明チップ ----
 var tip=document.getElementById("tip");
@@ -181,9 +198,12 @@ function updateTip(){
     else{
       var n=hoverNode;
       tip.innerHTML = '<b class="t">'+n.label+'</b>'
-        + '<span class="lv" style="background:'+LV[n.lv]+'">L'+n.lv+'</span>'
-        + '<span style="color:#8fa0b5;font-size:10px;margin-left:6px">'+DOMAINS[n.dom].name+'</span>'
-        + '<div style="margin-top:5px;color:#c9d4e3">'+n.desc+'</div>';
+        + (n.os
+            ? '<span class="lv" style="background:#ffd479">🧠 加藤OS</span>'
+            : '<span class="lv" style="background:'+LV[n.lv]+'">L'+n.lv+'</span>'
+              + '<span style="color:#8fa0b5;font-size:10px;margin-left:6px">'+DOMAINS[n.dom].name+'</span>')
+        + '<div style="margin-top:5px;color:#c9d4e3">'+n.desc+'</div>'
+        + (n.serifu? '<div class="serifu">🗣 「'+n.serifu+'」</div>' : '');
       tip.style.display="block";
     }
   }
@@ -195,21 +215,23 @@ function updateTip(){
 }
 
 function linkKey(l){ var a=l.source.id||l.source, b=l.target.id||l.target; return a<b? a+"|"+b : b+"|"+a; }
+function vis(n){ return !!n.os || n.lv<=maxLv; }   // 加藤OS星はフィルタの影響を受けず常時表示
 
 var elGraph = document.getElementById("graph");
 var Graph = ForceGraph3D({controlType:"orbit"})(elGraph)
   .backgroundColor("#04060f")
   .graphData({nodes:nodes, links:links})
   .nodeThreeObject(function(n){
-    var r = 3.4 + (5-n.lv)*1.05 + Math.min(deg[n.id]||1,12)*0.30;
+    var col = n.os ? GOLD : LV[n.lv];
+    var r = n.os ? 8.4 : 3.4 + (5-n.lv)*1.05 + Math.min(deg[n.id]||1,12)*0.30;
     n.__r = r;
-    var mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(r,24,24),
-      new THREE.MeshLambertMaterial({color:LV[n.lv], emissive:LV[n.lv], emissiveIntensity:0.45, transparent:true, opacity:0.95})
+    var geo = n.os ? new THREE.OctahedronGeometry(r,0) : new THREE.SphereGeometry(r,24,24);   // 加藤OS＝金の結晶
+    var mesh = new THREE.Mesh(geo,
+      new THREE.MeshLambertMaterial({color:col, emissive:col, emissiveIntensity:n.os?0.7:0.45, transparent:true, opacity:0.95})
     );
-    var halo = makeHalo(LV[n.lv], r*7);
+    var halo = makeHalo(col, r*(n.os?8:7));
     mesh.add(halo);
-    var label = new SpriteText(n.label, 4.4, "#c6d3e6");
+    var label = new SpriteText(n.label, n.os?4.8:4.4, n.os?"#ffe1a0":"#c6d3e6");
     label.fontFace = "Hiragino Sans, sans-serif";
     label.material.depthWrite = false; label.material.transparent = true;
     label.position.y = -(r+6);
@@ -217,8 +239,8 @@ var Graph = ForceGraph3D({controlType:"orbit"})(elGraph)
     n.__mat=mesh.material; n.__halo=halo; n.__label=label; n.__mesh=mesh;
     return mesh;
   })
-  .nodeVisibility(function(n){ return n.lv<=maxLv; })
-  .linkVisibility(function(l){ return l.source.lv<=maxLv && l.target.lv<=maxLv; })
+  .nodeVisibility(function(n){ return vis(n); })
+  .linkVisibility(function(l){ return vis(l.source) && vis(l.target); })
   .linkColor(function(l){ return actL[linkKey(l)] ? GOLD : (mode? "rgba(28,40,66,0.9)" : "rgba(95,120,170,0.8)"); })
   .linkOpacity(0.4)
   .linkWidth(function(l){ return actL[linkKey(l)] ? 1.6 : 0.35; })
@@ -248,7 +270,7 @@ var scene = Graph.scene();
 })();
 Object.keys(DOMAINS).forEach(function(k){
   var d=DOMAINS[k];
-  var t=new SpriteText(d.name, 13, "rgba(105,130,175,0.5)");
+  var t=new SpriteText(d.name, k==="katoos"?16:13, k==="katoos"?"rgba(255,212,121,0.55)":"rgba(105,130,175,0.5)");
   t.fontFace="Hiragino Sans, sans-serif"; t.material.depthWrite=false;
   t.position.set((d.x-CX)*S, -(d.y-CY)*S + 150, -40);
   scene.add(t);
@@ -260,7 +282,7 @@ function restyle(){
     var on = !mode || actN[n.id];
     var top = (mode==="node" && selected && n.id===selected.id) || (mode==="con" && conRank.length && conRank[0]===n.id);
     if(n.__mat){ n.__mat.opacity = on?0.95:0.08;
-      n.__mat.emissiveIntensity = top?1.1 : (on?0.45:0.06); }
+      n.__mat.emissiveIntensity = top?1.4 : (on?(n.os?0.7:0.45):0.06); }
     if(n.__halo) n.__halo.material.opacity = on?1:0.04;
     if(n.__label) n.__label.material.opacity = on?1:0.04;
     if(n.__mesh){ var s = top?1.35 : (mode==="con" && actN[n.id] ? 1.12 : 1); n.__mesh.scale.set(s,s,s); }
@@ -274,6 +296,7 @@ function clearHL(){ actN={}; actL={}; }
 var panel=document.getElementById("panel");
 function guide(){
   panel.innerHTML = '<h2>操作ガイド</h2><p class="hint">👆 <b>星にマウスを近づける</b> → その場で説明がポップアップ。<br>⭐ <b>星をクリック</b> → カメラが飛び、影響しあう要素だけが金色に光ります。<br>▶ <b>自動ツアー</b> → リンクを辿って星をめぐり、着くたびに解説を表示。眺めるだけの紹介モードです（クリックやドラッグで停止）。<br>🖱 ドラッグで回転、ホイールで拡大縮小。放っておくとゆっくり自転します。<br>🎚 左上のボタンでマニアック度を絞り込み。</p>'
+    + '<h3>🧠 加藤OSとは</h3><p class="hint"><b style="color:#ffd479">金色の結晶＝加藤OS</b>（FPあや本人の考え方の操作系）。クリックすると、その思想がどのFP知識と繋がっているかが宇宙に光ります。「選べるように持つ」を中核に、10の原則が95のFP知識を束ねています。</p>'
     + '<h3>🧭 FPツールとして使う</h3><p class="hint">「わたしの優先マップ診断」で5問答えると、優先テーマだけが星座として浮かびます。面談・セミナーの導入にどうぞ。</p>'
     + '<button class="pbtn" id="pDiag">🧭 わたしの優先マップ診断</button>';
   document.getElementById("pDiag").addEventListener("click", openDiag);
@@ -289,13 +312,17 @@ function selectNode(n){
     if(a===n.id||b===n.id){ actL[a<b?a+"|"+b:b+"|"+a]=true; actN[a===n.id?b:a]=true; }
   });
   var neighbors=Object.keys(actN).filter(function(id){return id!==n.id;}).map(function(id){return byId[id];})
-    .filter(function(m){return m.lv<=maxLv;}).sort(function(x,y){return x.lv-y.lv;});
+    .filter(vis).sort(function(x,y){return (x.os?0:x.lv)-(y.os?0:y.lv);});
+  var metaB = n.os
+    ? '<span class="badge" style="background:#ffd479;color:#1a1206">🧠 加藤OS｜あやの考え方の操作系</span>'
+    : '<span class="badge" style="background:'+LV[n.lv]+';color:#0a0f1c">マニアック度 L'+n.lv+'</span>'
+      + '<span class="badge" style="background:rgba(70,85,115,.8)">'+DOMAINS[n.dom].name+'</span>';
   panel.innerHTML = '<h2>'+n.label+'</h2>'
-    + '<div class="meta"><span class="badge" style="background:'+LV[n.lv]+';color:#0a0f1c">マニアック度 L'+n.lv+'</span>'
-    + '<span class="badge" style="background:rgba(70,85,115,.8)">'+DOMAINS[n.dom].name+'</span></div>'
+    + '<div class="meta">'+metaB+'</div>'
     + '<p>'+n.desc+'</p>'
+    + (n.serifu? '<div class="serifu">🗣 「'+n.serifu+'」</div>' : '')
     + '<h3>🔗 影響しあう要素（'+neighbors.length+'）</h3>'
-    + '<div>'+neighbors.map(function(m){return '<span class="chip" data-id="'+m.id+'" style="border-color:'+LV[m.lv]+'">'+m.label+' <small style="color:'+LV[m.lv]+'">L'+m.lv+'</small></span>';}).join("")+'</div>';
+    + '<div>'+neighbors.map(function(m){var c=m.os?GOLD:LV[m.lv];return '<span class="chip" data-id="'+m.id+'" style="border-color:'+c+'">'+m.label+' <small style="color:'+c+'">'+(m.os?'OS':'L'+m.lv)+'</small></span>';}).join("")+'</div>';
   panel.querySelectorAll(".chip").forEach(function(c){ c.addEventListener("click", function(){ var m=byId[c.dataset.id]; selectNode(m); flyTo(m); }); });
   restyle();
 }
@@ -367,6 +394,11 @@ document.getElementById("diagGo").addEventListener("click", function(){
 function applyConstellation(ids){
   mode="con"; selected=null; conRank=ids.slice(); clearHL();
   ids.forEach(function(id){ actN[id]=true; });
+  // このテーマ群を貫く加藤OSの考え方（2本以上つながる思想を自動で星座に同伴）
+  var osPicks=nodes.filter(function(n){return n.os;}).map(function(o){
+    return {o:o, k:(adj[o.id]||[]).filter(function(id){return actN[id];}).length};
+  }).filter(function(x){return x.k>=2;}).sort(function(a,b){return b.k-a.k;}).slice(0,3);
+  osPicks.forEach(function(x){ actN[x.o.id]=true; });
   links.forEach(function(l){
     var a=l.source.id||l.source, b=l.target.id||l.target;
     if(actN[a]&&actN[b]) actL[a<b?a+"|"+b:b+"|"+a]=true;
@@ -379,6 +411,9 @@ function applyConstellation(ids){
     + groups.map(function(g){ if(!g[1].length) return "";
         return '<h3>'+g[0]+'</h3><div>'+g[1].map(function(id){ var m=byId[id];
           return '<span class="chip '+g[2]+'" data-id="'+id+'" style="border-color:'+LV[m.lv]+'">'+m.label+'</span>'; }).join("")+'</div>'; }).join("")
+    + (osPicks.length? '<h3>🧠 あなたに効く加藤OSの考え方</h3><div>'
+        + osPicks.map(function(x){return '<span class="chip rank1" data-id="'+x.o.id+'" style="border-color:#ffd479">🧠 '+x.o.label+'</span>';}).join("")
+        + '</div>' : '')
     + '<p class="hint" style="margin-top:12px">チップをタップすると解説へ。この画面のまま、FP面談・セミナーの「今日はどこから話すか」の合意にも使えます。</p>'
     + '<button class="pbtn" id="pReset">🌌 宇宙全体に戻る</button>';
   panel.querySelectorAll(".chip").forEach(function(c){ c.addEventListener("click", function(){ var m=byId[c.dataset.id]; selectNode(m); flyTo(m); }); });
@@ -394,7 +429,7 @@ var lvbtns=document.getElementById("lvbtns");
   b.className="lvbtn"+(pair[0]==="5"?" active":""); b.textContent="L"+pair[0]+" "+pair[1]; b.dataset.lv=pair[0];
   b.addEventListener("click", function(){
     maxLv=+pair[0]; syncLvBtns();
-    if(mode==="node" && selected && selected.lv>maxLv) clearAll();
+    if(mode==="node" && selected && !vis(selected)) clearAll();
     Graph.nodeVisibility(Graph.nodeVisibility());
     Graph.linkVisibility(Graph.linkVisibility());
     restyle();
@@ -412,14 +447,24 @@ tourBtn.className="lvbtn diag"; tourBtn.textContent="▶ 自動ツアー";
 tourBtn.addEventListener("click", function(){ tour.on? stopTour() : startTour(); });
 lvbtns.appendChild(tourBtn);
 
-function visibleNodes(){ return nodes.filter(function(n){ return n.lv<=maxLv; }); }
+function visibleNodes(){ return nodes.filter(vis); }
+var captionEl=document.getElementById("caption");
+function showCaption(n){
+  captionEl.innerHTML='<b>'+(n.os?'🧠 ':'')+n.label+'</b>'
+    + '<div class="cap-body">'+(n.serifu? '🗣 「'+n.serifu+'」' : n.desc)+'</div>';
+  captionEl.classList.add("show");
+}
+function hideCaption(){ captionEl.classList.remove("show"); }
+document.getElementById("stopBtn").addEventListener("click", stopTour);
+
 function startTour(){
   tour.on=true; tour.visited={};
   controls.autoRotate=false; clearTimeout(idleT);
   tip.style.display="none";
+  document.body.classList.add("touring");   // 左右メニューを画面外へ
   // 開始点: 選択中の星 → なければ全体のハブ「キャッシュフロー表」
-  var start = (mode==="node" && selected && selected.lv<=maxLv) ? selected
-            : (byId["cf"] && byId["cf"].lv<=maxLv ? byId["cf"] : visibleNodes()[0]);
+  var start = (mode==="node" && selected && vis(selected)) ? selected
+            : (byId["cf"] && vis(byId["cf"]) ? byId["cf"] : visibleNodes()[0]);
   tourGo(start);
 }
 function tourGo(n){
@@ -427,9 +472,16 @@ function tourGo(n){
   clearTimeout(tour.timer);   // 二重タイマー防止
   tour.visited[n.id]=1;
   tourBtn.textContent="⏸ ツアー中 "+Object.keys(tour.visited).length+"/"+visibleNodes().length;
-  selectNode(n);          // 説明パネル＋影響リンクの発光
-  flyTo(n, 2200);         // ゆっくり近づく
-  tour.timer=setTimeout(tourNext, 7000);
+  hideCaption();
+  if(trail.on) trail.mat.opacity=0.14;      // 飛行中は残像を長めに
+  flyTo(n, 2400);                           // まず移動（前の星のリンクは光ったまま）
+  tour.timer=setTimeout(function(){         // 到着してからリンク・解説を切り替える
+    if(!tour.on) return;
+    if(trail.on) trail.mat.opacity=0.30;
+    selectNode(n);
+    showCaption(n);
+    tour.timer=setTimeout(tourNext, 5600);
+  }, 2500);
 }
 function tourNext(){
   if(!tour.on) return;
@@ -443,6 +495,9 @@ function tourNext(){
 function stopTour(){
   tour.on=false; clearTimeout(tour.timer);
   tourBtn.textContent="▶ 自動ツアー";
+  document.body.classList.remove("touring");   // メニューを戻す
+  hideCaption();
+  if(trail.on && trail.mat) trail.mat.opacity=0.30;
   wake();
 }
 function syncLvBtns(){ lvbtns.querySelectorAll(".lvbtn").forEach(function(x){ if(x.dataset.lv) x.classList.toggle("active", x.dataset.lv==String(maxLv)); }); }
@@ -450,7 +505,7 @@ function syncLvBtns(){ lvbtns.querySelectorAll(".lvbtn").forEach(function(x){ if
 // ---- 検索 ----
 document.getElementById("search").addEventListener("input", function(e){
   var q=e.target.value.trim(); if(!q) return;
-  var hit=nodes.find(function(n){ return n.lv<=maxLv && (n.label.indexOf(q)>=0 || n.desc.indexOf(q)>=0); });
+  var hit=nodes.find(function(n){ return vis(n) && (n.label.indexOf(q)>=0 || n.desc.indexOf(q)>=0); });
   if(hit){ selectNode(hit); flyTo(hit); }
 });
 
@@ -468,7 +523,7 @@ function pickAt(px, py){
   var tanH=Math.tan((cam.fov||75)*0.5*Math.PI/180);
   var best=null, bestD=1e9;
   for(var i=0;i<nodes.length;i++){
-    var n=nodes[i]; if(n.lv>maxLv) continue;
+    var n=nodes[i]; if(!vis(n)) continue;
     var v=new THREE.Vector3(n.x||0, n.y||0, n.z||0).project(cam);
     if(v.z>1 || v.z<-1) continue;   // カメラの後ろ・範囲外
     var sx=(v.x+1)/2*w, sy=(1-v.y)/2*h;
@@ -504,6 +559,28 @@ elGraph.addEventListener("pointerup", function(e){
   requestAnimationFrame(pickLoop);
   if(mouseIn) runPick();
 })();
+
+// ---- 残像（モーションブラー）----
+// 前フレームを完全に消さず、背景色の薄い膜を毎フレーム重ねる方式。
+// カメラが動くと星と光が尾を引く。ツアー飛行中は膜を薄くして尾を長くする。
+(function(){
+  var renderer=Graph.renderer(), cam=Graph.camera();
+  renderer.autoClearColor=false;                    // 前フレームの色を残す
+  trail.mat=new THREE.MeshBasicMaterial({color:0x04060f, transparent:true, opacity:0.30, depthWrite:false, depthTest:false});
+  trail.quad=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000), trail.mat);
+  trail.quad.renderOrder=-1e9;                      // 毎フレーム最初に薄膜を描く＝古い絵がフェード
+  trail.quad.position.set(0,0,-8);
+  cam.add(trail.quad); scene.add(cam);
+})();
+var trailBtn=document.createElement("button");
+trailBtn.className="lvbtn"; trailBtn.textContent="✨ 残像 ON";
+trailBtn.addEventListener("click", function(){
+  trail.on=!trail.on;
+  Graph.renderer().autoClearColor=!trail.on;
+  trail.quad.visible=trail.on;
+  trailBtn.textContent=trail.on? "✨ 残像 ON":"✨ 残像 OFF";
+});
+lvbtns.appendChild(trailBtn);
 
 // ---- イントロ ----
 Graph.cameraPosition({x:0,y:60,z:1500});

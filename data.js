@@ -123,4 +123,52 @@ const NODES = [
 ];
 
 
+// ==== 加藤OS（あや本人の考え方の操作系・frameworks/加藤OS.md 2026-07-05版より）====
+// os:true の星は金色の結晶として描画され、マニアック度フィルタの影響を受けない。
+// serifu = 決め台詞。数値・利回り・返戻率は断定しない（原典の制約メモ遵守）。
+DOMAINS.katoos = {name:"加藤OS", x:1450, y:470};
+const OS_NODES = [
+{id:"os_core",os:true,lv:1,dom:"katoos",label:"選べるように持つ【中核思想】",
+ desc:"加藤OSの中核。出口戦略は「正解の商品を当てること」ではなく「将来の選択肢を減らさないこと」。分散は選択肢を増やすためであり、持たない自由も選択肢のうち。",
+ serifu:"老後の安心とは「何が起きても絶対大丈夫」ではありません。「何が起きても選べる余地がある」ことです。",
+ links:["os_saifu3","os_3sou","os_nisa_ideco","os_tsuka","os_junban","assetalloc","rougo","risktol"]},
+{id:"os_saifu3",os:true,lv:1,dom:"katoos",label:"3つの財布",
+ desc:"お金を役割で分ける──すぐ使う（生活費・数年以内）／守る（生活の土台）／育てる（長寿とインフレに備える）。外側の土台に公的年金。役割が決まるとお金は使いやすくなる。",
+ serifu:"役割を間違えると不安の原因になる。役割が決まると、お金はかなり使いやすくなります。",
+ links:["os_core","emergency","saving","nenkin","rougo"]},
+{id:"os_3sou",os:true,lv:1,dom:"katoos",label:"守り・確定・攻めの3層",
+ desc:"守り=生活を崩さない／確定=将来の安心を予約する／攻め=資産寿命を延ばす。どれが正しいかではなく「どの財布に置くか」で決める。守りの投資を「つまらない投資」と言わない。",
+ serifu:"守りは、生活を守るためのお金。攻めは、長生きとインフレに負けないためのお金。",
+ links:["os_core","assetalloc","risktol","jisshitsu"]},
+{id:"os_nisa_ideco",os:true,lv:1,dom:"katoos",label:"NISA=入れ直せる／iDeCo=入れ直せない",
+ desc:"加藤OSの中心決定ルール。NISAは売っても枠が復活する流動性の高い財布、iDeCoは一度受け取ると戻せない老後後半の財布。だから使う順番は現金→NISA→iDeCoが基本形。",
+ serifu:"NISAは入れ直せる。iDeCoは入れ直せない。だから、先に使うのはNISA。",
+ links:["os_core","os_junban","os_zeikin","nisa","ideco"]},
+{id:"os_zeikin",os:true,lv:1,dom:"katoos",label:"税金は主役ではない",
+ desc:"iDeCoは節税商品ではなく「税の繰延べ運用枠」。出口で税金が出るのは失敗ではなく、現役時代に頑張った証拠。節税のために老後後半の財布を早く手放さない。",
+ serifu:"税金は、人生設計の主役ではありません。主役は、老後のお金をどう残し、どう使い、誰を守るかです。",
+ links:["os_nisa_ideco","ideco","taishoku_kojo","dc_uketori","rule5_19"]},
+{id:"os_tsuma",os:true,lv:1,dom:"katoos",label:"年下の妻を守る視点【中核】",
+ desc:"退職金・年金が多い夫の税金対策より大事なのは、夫の年金が消えた後に残される妻の毎月収入。妻自身の年金が薄い家庭ほど「妻が迷わず使えるお金をどう残すか」が本質。",
+ serifu:"大事なのは、年下の妻がひとりになった後も、お金を迷わず使える形にしておくことです。",
+ links:["os_hoken","izoku","nenkin","kakyunenkin","hoken_seimei"]},
+{id:"os_hoken",os:true,lv:1,dom:"katoos",label:"保険=守り中の守り",
+ desc:"貯蓄性の保険は投資の代わりではなく、受取人を決めて確実に渡すための「資産の形替え」。最後まで残れば死亡保険金、途中で必要なら解約返戻金という二面性を持てる場合がある（商品・契約条件による）。",
+ serifu:"死んでも使っても意味がある、最後の守りです。",
+ links:["os_tsuma","hoken_seimei","hoken_hikazei","souzokuzei"]},
+{id:"os_tsuka",os:true,lv:1,dom:"katoos",label:"円だけ保有=円への集中投資",
+ desc:"為替リスクとは「海外投資で損すること」ではなく「円で見た価値がブレること」。円だけで持つのはリスクゼロではなく、円という通貨への集中。理想は「年金は円、財産は世界にも」。",
+ serifu:"年金は円で受け取る。だから資産は世界にも置いておく。これが老後の通貨分散です。",
+ links:["os_core","assetalloc","inflation","kinyu_seisaku"]},
+{id:"os_junban",os:true,lv:1,dom:"katoos",label:"出口の取り崩し順番",
+ desc:"目安は年金（土台）→現金・退職金→課税口座→NISA→iDeCo→保険→不動産。課税される分を先に使い、非課税の財布を長生きさせるのが自然な場面が多い（個別事情で入れ替わる）。",
+ serifu:"老後資金は、増やす力だけではなく、使う順番で寿命が変わります。",
+ links:["os_core","os_nisa_ideco","os_kurisage","torikuzushi","rule4","taishoku"]},
+{id:"os_kurisage",os:true,lv:1,dom:"katoos",label:"年金は選べる制度",
+ desc:"公的年金は「もらうだけ」ではなく、いつから・いくらで受けるか選べる制度。繰下げで終身の土台を厚くし、理想のゴールは「最後は年金のみで日常が回る」状態。残った資産は使う自由・遺す自由になる。",
+ serifu:"晩年、日常が年金だけで回るなら、残ったお金は全部「自由」になります。使う自由と、遺す自由に。",
+ links:["os_junban","nenkin","kurisage","kenkoujumyo","zaishoku"]},
+];
+NODES.push(...OS_NODES);
+
 window.LP = { DOMAINS, LVCOLOR, NODES };
