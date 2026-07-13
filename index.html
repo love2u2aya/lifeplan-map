@@ -484,7 +484,7 @@ function tourGo(n){
   flyTo(n, 2400);                           // まず移動（前の星のリンクは光ったまま）
   tour.timer=setTimeout(function(){         // 到着してからリンク・解説を切り替える
     if(!tour.on) return;
-    if(trail.on) trail.mat.opacity=0.30;
+    if(trail.on) trail.mat.opacity=0.22;
     selectNode(n);
     showCaption(n);
     tour.timer=setTimeout(tourNext, 5600);
@@ -504,7 +504,7 @@ function stopTour(){
   tourBtn.textContent="▶ 自動ツアー";
   document.body.classList.remove("touring");   // メニューを戻す
   hideCaption();
-  if(trail.on && trail.mat) trail.mat.opacity=0.30;
+  if(trail.on && trail.mat) trail.mat.opacity=0.22;
   wake();
 }
 function syncLvBtns(){ lvbtns.querySelectorAll(".lvbtn").forEach(function(x){ if(x.dataset.lv) x.classList.toggle("active", x.dataset.lv==String(maxLv)); }); }
@@ -573,7 +573,7 @@ elGraph.addEventListener("pointerup", function(e){
 (function(){
   var renderer=Graph.renderer(), cam=Graph.camera();
   renderer.autoClearColor=false;                    // 前フレームの色を残す
-  trail.mat=new THREE.MeshBasicMaterial({color:0x04060f, transparent:true, opacity:0.30, depthWrite:false, depthTest:false});
+  trail.mat=new THREE.MeshBasicMaterial({color:0x04060f, transparent:true, opacity:0.22, depthWrite:false, depthTest:false});
   trail.quad=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000), trail.mat);
   trail.quad.renderOrder=-1e9;                      // 毎フレーム最初に薄膜を描く＝古い絵がフェード
   trail.quad.position.set(0,0,-8);
@@ -590,7 +590,7 @@ trailBtn.addEventListener("click", function(){
 lvbtns.appendChild(trailBtn);
 
 // ---- アートFX：スターウォーズ級演出＆流体 ----
-var fx={on:true, wisps:null, wispPos:null, wispGeo:null, streaks:null, streakMat:null, streakSeeds:[], shocks:[], nebulaGrp:null, baseFov:null};
+var fx={on:true, wispLayers:[], blobs:[], streaks:null, streakMat:null, streakSeeds:[], shocks:[], nebulaGrp:null, baseFov:null};
 
 // 絵の具星雲（加算合成スプライト）
 function nebulaTexture(seedHue){
@@ -623,28 +623,51 @@ function nebulaTexture(seedHue){
   scene.add(fx.nebulaGrp);
 })();
 
-// 流体ウィスプ（渦の流線。残像ONと合わせると絵の具の流体実験風）
-(function(){
-  var N=1300;
-  fx.wispPos=new Float32Array(N*3); var col=new Float32Array(N*3);
+// ドロドロ流体（大小の絵の具しずく3層＋見えないアトラクタ7個に引かれて塊で渦を巻く）
+var dotTexCache=null;
+function dotTexture(){
+  if(dotTexCache) return dotTexCache;
+  var c=document.createElement("canvas"); c.width=c.height=64; var x=c.getContext("2d");
+  var g=x.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,"rgba(255,255,255,1)"); g.addColorStop(0.45,"rgba(255,255,255,0.5)"); g.addColorStop(1,"rgba(255,255,255,0)");
+  x.fillStyle=g; x.fillRect(0,0,64,64);
+  dotTexCache=new THREE.CanvasTexture(c); return dotTexCache;
+}
+function makeWispLayer(N,size,op){
+  var pos=new Float32Array(N*3), col=new Float32Array(N*3);
   for(var i=0;i<N;i++){
     var R=Math.pow(Math.random(),0.5)*720, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
-    fx.wispPos[i*3]=R*Math.sin(ph)*Math.cos(th); fx.wispPos[i*3+1]=R*Math.sin(ph)*Math.sin(th)*0.7; fx.wispPos[i*3+2]=R*Math.cos(ph);
+    pos[i*3]=R*Math.sin(ph)*Math.cos(th); pos[i*3+1]=R*Math.sin(ph)*Math.sin(th)*0.7; pos[i*3+2]=R*Math.cos(ph);
     var gold=Math.random()<0.22;   // 2割は加藤OSの金
     col[i*3]=gold?1.0:0.35+Math.random()*0.2; col[i*3+1]=gold?0.83:0.5+Math.random()*0.25; col[i*3+2]=gold?0.45:0.95;
   }
-  fx.wispGeo=new THREE.BufferGeometry();
-  fx.wispGeo.setAttribute("position", new THREE.BufferAttribute(fx.wispPos,3));
-  fx.wispGeo.setAttribute("color", new THREE.BufferAttribute(col,3));
-  fx.wisps=new THREE.Points(fx.wispGeo, new THREE.PointsMaterial({size:2.0, vertexColors:true, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false}));
-  fx.wisps.frustumCulled=false;
-  scene.add(fx.wisps);
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col,3));
+  var pts=new THREE.Points(geo, new THREE.PointsMaterial({size:size, map:dotTexture(), vertexColors:true, transparent:true, opacity:op, blending:THREE.AdditiveBlending, depthWrite:false}));
+  pts.frustumCulled=false;
+  scene.add(pts);
+  fx.wispLayers.push({pos:pos, geo:geo, pts:pts});
+}
+makeWispLayer(900, 2.6, 0.50);   // 細かい霧
+makeWispLayer(420, 6.0, 0.38);   // 中しずく
+makeWispLayer(170, 12.0, 0.28);  // 大きな絵の具の塊
+// アトラクタ（リサージュ軌道でゆっくり泳ぐ見えない引力点＝粒が塊になってドロドロ流れる）
+(function(){
+  for(var i=0;i<7;i++){
+    fx.blobs.push({ax:250+Math.random()*380, ay:180+Math.random()*260, az:250+Math.random()*380,
+      f1:0.05+Math.random()*0.09, f2:0.04+Math.random()*0.08, f3:0.05+Math.random()*0.07,
+      p1:Math.random()*6.28, p2:Math.random()*6.28, p3:Math.random()*6.28, x:0,y:0,z:0});
+  }
 })();
 
-// ハイパースペース光条（カメラが速く動くほど星が線に伸びる）
+// ハイパースペース光条（カメラの実移動方向＝ドラッグ・飛行の向きに尾が流れる）
 (function(){
   var SN=240;
-  for(var i=0;i<SN;i++) fx.streakSeeds.push({x:(Math.random()-0.5)*700, y:(Math.random()-0.5)*700, z:-60-Math.random()*820});
+  for(var i=0;i<SN;i++){
+    var R=250+Math.random()*600, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    fx.streakSeeds.push({x:R*Math.sin(ph)*Math.cos(th), y:R*Math.sin(ph)*Math.sin(th), z:R*Math.cos(ph)});
+  }
   var g=new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(SN*2*3),3));
   fx.streakMat=new THREE.LineBasicMaterial({color:0xcfe2ff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false});
@@ -673,41 +696,67 @@ function spawnShock(n){
   scene.add(sp);
 }
 
-// FXループ（毎フレーム：流体・光条・FOVパンチ・衝撃波）
+// FXループ（毎フレーム：ドロドロ流体・移動方向連動の光条・FOVパンチ・衝撃波）
 var prevCam=null;
+var _wv=new THREE.Vector3(), _lv=new THREE.Vector3(), _invQ=new THREE.Quaternion();
 (function fxLoop(){
   requestAnimationFrame(fxLoop);
   var cam=Graph.camera(); if(!cam) return;
   var t=performance.now()*0.001;
   if(!prevCam){ prevCam=cam.position.clone(); fx.baseFov=cam.fov; }
-  var speed=cam.position.distanceTo(prevCam); prevCam.copy(cam.position);
+  _wv.copy(cam.position).sub(prevCam);          // ワールド系のカメラ移動
+  var speed=_wv.length();
+  prevCam.copy(cam.position);
+  _invQ.copy(cam.quaternion).invert();
+  _lv.copy(_wv).applyQuaternion(_invQ);          // カメラ座標系の移動＝ドラッグ/飛行の向き
   if(fx.on){
-    // 流体ウィスプ：三重の正弦流れ場で渦を巻く
-    var p=fx.wispPos;
-    for(var i=0;i<p.length;i+=3){
-      var X=p[i],Y=p[i+1],Z=p[i+2];
-      p[i]  += (Math.sin(0.0042*Y + t*0.30) + 0.5*Math.sin(0.0023*Z - t*0.17))*0.55;
-      p[i+1]+= (Math.sin(0.0042*Z + t*0.26) + 0.5*Math.sin(0.0023*X + t*0.19))*0.45;
-      p[i+2]+= (Math.sin(0.0042*X + t*0.22) + 0.5*Math.sin(0.0023*Y - t*0.13))*0.55;
-      if(X*X+Y*Y+Z*Z > 1000000){ p[i]*=0.02; p[i+1]*=0.02; p[i+2]*=0.02; }
+    // アトラクタ（見えない引力点）をリサージュ軌道で泳がせる
+    for(var b=0;b<fx.blobs.length;b++){
+      var B=fx.blobs[b];
+      B.x=B.ax*Math.sin(B.f1*t+B.p1); B.y=B.ay*Math.sin(B.f2*t+B.p2); B.z=B.az*Math.sin(B.f3*t+B.p3);
     }
-    fx.wispGeo.attributes.position.needsUpdate=true;
+    // ドロドロ流体：低周波の大渦＋最寄りアトラクタへの引力で、塊のままゆっくり流れる
+    for(var L=0;L<fx.wispLayers.length;L++){
+      var p=fx.wispLayers[L].pos;
+      for(var i=0;i<p.length;i+=3){
+        var X=p[i],Y=p[i+1],Z=p[i+2];
+        var vx=(Math.sin(0.0016*Y + t*0.16) + 0.6*Math.sin(0.0009*Z - t*0.11))*0.42;
+        var vy=(Math.sin(0.0016*Z + t*0.14) + 0.6*Math.sin(0.0009*X + t*0.12))*0.34;
+        var vz=(Math.sin(0.0016*X + t*0.12) + 0.6*Math.sin(0.0009*Y - t*0.09))*0.42;
+        var bd=1e18, bx=0,by=0,bz=0;
+        for(var b2=0;b2<fx.blobs.length;b2++){
+          var Bb=fx.blobs[b2];
+          var dx0=Bb.x-X, dy0=Bb.y-Y, dz0=Bb.z-Z, d2=dx0*dx0+dy0*dy0+dz0*dz0;
+          if(d2<bd){ bd=d2; bx=dx0; by=dy0; bz=dz0; }
+        }
+        p[i]  = X + vx + bx*0.0022;
+        p[i+1]= Y + vy + by*0.0022;
+        p[i+2]= Z + vz + bz*0.0022;
+        if(X*X+Y*Y+Z*Z > 1000000){ p[i]*=0.02; p[i+1]*=0.02; p[i+2]*=0.02; }
+      }
+      fx.wispLayers[L].geo.attributes.position.needsUpdate=true;
+    }
     fx.nebulaGrp.rotation.y = t*0.008;
   }
-  // 光条：速度でフェードイン、長さも速度比例
-  var want = fx.on ? Math.min(Math.max((speed-1.2)*0.16,0),0.9) : 0;
+  // 光条：速度でフェードイン、尾は「実際に動いた方向」へ伸びる
+  var want = fx.on ? Math.min(Math.max((speed-1.0)*0.16,0),0.95) : 0;
   fx.streakMat.opacity += (want-fx.streakMat.opacity)*0.18;
   fx.streaks.visible = fx.streakMat.opacity>0.02;
-  if(fx.streaks.visible){
-    var len=Math.min(speed*4.5,120)+8;
+  if(fx.streaks.visible && speed>0.0001){
+    var len=Math.min(speed*5.5,150)+6;
+    var dnx=_lv.x/speed, dny=_lv.y/speed, dnz=_lv.z/speed;
     var arr=fx.streaks.geometry.attributes.position.array;
     for(var j=0;j<fx.streakSeeds.length;j++){
       var s=fx.streakSeeds[j];
-      s.z += speed*3.2;
-      if(s.z>-30){ s.z=-700-Math.random()*250; s.x=(Math.random()-0.5)*700; s.y=(Math.random()-0.5)*700; }
+      s.x-=_lv.x*1.35; s.y-=_lv.y*1.35; s.z-=_lv.z*1.35;   // 星景は移動と逆向きに流れる
+      var r2=s.x*s.x+s.y*s.y+s.z*s.z;
+      if(r2>902500 || r2<2025){                             // 外へ出た/カメラを通過→再配置
+        var R=250+Math.random()*600, th2=Math.random()*Math.PI*2, ph2=Math.acos(2*Math.random()-1);
+        s.x=R*Math.sin(ph2)*Math.cos(th2); s.y=R*Math.sin(ph2)*Math.sin(th2); s.z=R*Math.cos(ph2);
+      }
       var k=j*6;
       arr[k]=s.x; arr[k+1]=s.y; arr[k+2]=s.z;
-      arr[k+3]=s.x; arr[k+4]=s.y; arr[k+5]=s.z-len;
+      arr[k+3]=s.x+dnx*len; arr[k+4]=s.y+dny*len; arr[k+5]=s.z+dnz*len;
     }
     fx.streaks.geometry.attributes.position.needsUpdate=true;
   }
@@ -727,7 +776,8 @@ var artBtn=document.createElement("button");
 artBtn.className="lvbtn diag"; artBtn.textContent="🎨 アートFX ON";
 artBtn.addEventListener("click", function(){
   fx.on=!fx.on;
-  fx.nebulaGrp.visible=fx.on; fx.wisps.visible=fx.on;
+  fx.nebulaGrp.visible=fx.on;
+  fx.wispLayers.forEach(function(l){ l.pts.visible=fx.on; });
   if(!fx.on) fx.streaks.visible=false;
   artBtn.textContent=fx.on? "🎨 アートFX ON":"🎨 アートFX OFF";
 });
